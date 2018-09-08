@@ -1,0 +1,8 @@
+prefix=/home/mhasek/Documents/ESE680/Lidar_lab/lidar_lab_ws/devel
+
+Name: vesc_msgs
+Description: Description of vesc_msgs
+Version: 0.0.1
+Cflags: -I/home/mhasek/Documents/ESE680/Lidar_lab/lidar_lab_ws/devel/include
+Libs: -L/home/mhasek/Documents/ESE680/Lidar_lab/lidar_lab_ws/devel/lib 
+Requires: std_msgs message_runtime

@@ -1,0 +1,8 @@
+prefix=/home/mhasek/Documents/ESE680/Lidar_lab/lidar_lab_ws/devel
+
+Name: lidart_gap_finding
+Description: Description of lidart_gap_finding
+Version: 0.0.0
+Cflags: -I/home/mhasek/Documents/ESE680/Lidar_lab/lidar_lab_ws/devel/include -I/usr/include
+Libs: -L/home/mhasek/Documents/ESE680/Lidar_lab/lidar_lab_ws/devel/lib 
+Requires: roscpp rospy std_msgs geometry_msgs message_runtime

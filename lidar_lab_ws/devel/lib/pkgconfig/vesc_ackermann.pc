@@ -1,0 +1,8 @@
+prefix=/home/mhasek/Documents/ESE680/Lidar_lab/lidar_lab_ws/devel
+
+Name: vesc_ackermann
+Description: Description of vesc_ackermann
+Version: 0.0.1
+Cflags: -I/home/mhasek/Documents/ESE680/Lidar_lab/lidar_lab_ws/src/f110-fall2018-skeletons/system/vesc/vesc_ackermann/include
+Libs: -L/home/mhasek/Documents/ESE680/Lidar_lab/lidar_lab_ws/devel/lib 
+Requires: nodelet pluginlib roscpp nav_msgs std_msgs geometry_msgs tf ackermann_msgs vesc_msgs

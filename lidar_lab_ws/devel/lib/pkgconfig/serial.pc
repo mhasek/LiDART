@@ -1,0 +1,8 @@
+prefix=/home/mhasek/Documents/ESE680/Lidar_lab/lidar_lab_ws/devel
+
+Name: serial
+Description: Description of serial
+Version: 1.2.1
+Cflags: -I/home/mhasek/Documents/ESE680/Lidar_lab/lidar_lab_ws/src/f110-fall2018-skeletons/system/serial/include
+Libs: -L/home/mhasek/Documents/ESE680/Lidar_lab/lidar_lab_ws/devel/lib -lserial -lrt -lpthread
+Requires: 
