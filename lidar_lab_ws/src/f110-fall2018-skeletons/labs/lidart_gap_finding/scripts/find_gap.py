@@ -12,11 +12,8 @@ import matplotlib
 matplotlib.use('GTKAgg')
 import matplotlib.pyplot as plt
 from lidart_gap_finding.msg import gaps
-
 from sklearn.mixture import GaussianMixture as GMM
-
 from matplotlib.patches import Ellipse
-
 from sklearn.cluster import DBSCAN
 
 plt.ion()
@@ -25,16 +22,15 @@ plt.show()
 
 pub_dp = rospy.Publisher('/drive_parameters', drive_param, queue_size=1)
 pub_gc = rospy.Publisher('/gap_center', Vector3, queue_size=1)
-pub_g = rospy.Publisher('/gaps', gaps, queue_size=1)
-
-
-# Callback that receives LIDAR data on the /scan topic.
-# data: the LIDAR data, published as sensor_msgs::LaserScan
+pub_g = rospy.Publisher('/lidar_gap', gaps, queue_size=1)
 
 def pol2cart(theta,r):
 	x = r*np.cos(theta)
 	y = r*np.sin(theta)
 	return x,y
+
+# Callback that receives LIDAR data on the /scan topic.
+# data: the LIDAR data, published as sensor_msgs::LaserScan
 
 def scan_callback(data):
 	scans = np.array(data.ranges)
@@ -63,7 +59,7 @@ def scan_callback(data):
 
 	n_clusters = len(set(label)) - (1 if -1 in label else 0)
 
-	OAT = 3
+	OAT = 3 # obstacle avoidance threshold
 	cent = np.zeros((n_clusters,2))
 	cent_p = np.zeros((n_clusters,2))
 	cent_p_polar = np.zeros((n_clusters,2))
@@ -72,27 +68,27 @@ def scan_callback(data):
 
 	for i in range(n_clusters):
 		dat_clus = data_xy[label==i,:]
-		cent[i,:] = np.mean(dat_clus,axis=0)
-		cent_idx = np.argmin(np.sum( (dat_clus - cent[i,:])**2, axis=1 ))
-		cent_p[i,:] = dat_clus[cent_idx,:]
+		cent[i,:] = np.mean(dat_clus,axis=0) # vertical average
+
+		cent_idx = np.argmin(np.sum( (dat_clus - cent[i,:])**2, axis=1 )) #finding the closest point in the cluster to the centroid.
+		cent_p[i,:] = dat_clus[cent_idx,:] #a matrix of on-cluster central points
 
 		dat_clus_polar = data[label==i,:]
 
-
 		pot_obs_idx = (scans[label==i] < OAT).reshape(-1)
-		if np.sum(pot_obs_idx)<5:
+		if np.sum(pot_obs_idx)<5: # if the valid scan datapoints within OAT is smaller than 5, then ignore this cluster
 			continue
 
 		pot_obs = dat_clus_polar[pot_obs_idx,:]
-		obs_bound[i,:] = pot_obs[(1,-1),:].reshape(1,4)
+		obs_bound[i,:] = pot_obs[(1,-1),:].reshape(1,4) # get the first one and the last one polar coordinates of the obstacles and save them in the shape of (1,4)
 
-		cent_p_polar[i,:] = dat_clus_polar[cent_idx,:]
+		cent_p_polar[i,:] = dat_clus_polar[cent_idx,:] # get the on-cluster center polar coordinates
 
 	
-	obs_bound = obs_bound[obs_bound[:,0].argsort(),:]
+	obs_bound = obs_bound[obs_bound[:,0].argsort(),:] # sort the obs_bound points by angle
 
+	# initialize an empty gap message
 	gaps_data = gaps()
-
 	
 	gaps_data.theta1.append(theta_min)
 	gaps_data.r1.append(OAT)
@@ -101,38 +97,19 @@ def scan_callback(data):
 	gaps_data.x1.append(x)
 	gaps_data.y1.append(y)
 
-	flip = 1
 	for obst in obs_bound:
-		if flip == 1:
-			gaps_data.theta2.append(obst[0])
-			gaps_data.r2.append(obst[1])
-			gaps_data.theta1.append(obst[2])
-			gaps_data.r1.append(obst[3])
+		gaps_data.theta2.append(obst[0])
+		gaps_data.r2.append(obst[1])
+		gaps_data.theta1.append(obst[2])
+		gaps_data.r1.append(obst[3])
 
-			x,y = pol2cart(obst[0], obst[1])
-			gaps_data.x2.append(x)
-			gaps_data.y2.append(y)
+		x,y = pol2cart(obst[0], obst[1])
+		gaps_data.x2.append(x)
+		gaps_data.y2.append(y)
 
-			x,y = pol2cart(obst[2], obst[3])
-			gaps_data.x1.append(x)
-			gaps_data.y1.append(y)
-
-			flip = 0
-		else:
-			gaps_data.theta1.append(obst[0])
-			gaps_data.r1.append(obst[1])
-			gaps_data.theta2.append(obst[2])
-			gaps_data.r2.append(obst[3])			
-
-			x,y = pol2cart(obst[0], obst[1])
-			gaps_data.x1.append(x)
-			gaps_data.y1.append(y)
-
-			x,y = pol2cart(obst[2], obst[3])
-			gaps_data.x2.append(x)
-			gaps_data.y2.append(y)
-
-			flip = 1
+		x,y = pol2cart(obst[2], obst[3])
+		gaps_data.x1.append(x)
+		gaps_data.y1.append(y)
 
 	gaps_data.theta2.append(theta_max)
 	gaps_data.r2.append(OAT)
@@ -140,7 +117,6 @@ def scan_callback(data):
 	x,y = pol2cart(theta_max, OAT)
 	gaps_data.x2.append(x)
 	gaps_data.y2.append(y)
-
 
 	for i in range(n_clusters+1):
 		dx = abs(gaps_data.x2[i] - gaps_data.x1[i])
@@ -151,72 +127,18 @@ def scan_callback(data):
 	g_ang = np.array(gaps_data.delta_angle)
 	g_len = np.array(gaps_data.euc_length)
 
-	gap_idx = np.argmax(g_len*(g_ang>0.5))
+	gap_idx = np.argmax(g_len*(g_ang>0.5)) # add angle threshold to be > 0.5 rad
 
+	# initialize gap_center message
 	gap_center = Vector3()
 	gap_center.x = (gaps_data.x1[gap_idx] + gaps_data.x2[gap_idx])/2
 	gap_center.y = (gaps_data.y1[gap_idx] + gaps_data.y2[gap_idx])/2
 	gap_center.z = 0
 
-
-# # Calculate shortest distance to front obstacle
-# 	Lc = 0.2
-# 	FDT = 5
-
-# 	idx = (np.abs(data_xy[:,1])<Lc/2) & (np.abs(data_xy[:,0])<FDT) & (data_xy[:,0]>0)
-
-# 	if np.sum(idx) > 0:
-
-# 		d_SDF = np.min(data_xy[idx,0])
-
-# 	else:
-# 		d_SDF = np.inf
-
-
-# 	SDT = 3
-# # Calculate shortest distance to right obstacle
-	
-# 	idx = (data[:,0] < -1.5) & (np.abs(data_xy[:,1])<SDT)
-	
-# 	if np.sum(idx) > 0:
-
-# 		d_RS = np.min(np.abs(data[idx,1]))
-	
-# 	else:
-# 		d_RS = np.inf	
-
-# # Calculate shortest distance to left obstacle
-	
-# 	idx = (data[:,0] > 1.5) & (np.abs(data_xy[:,1])<SDT)
-	
-# 	if np.sum(idx) > 0:
-
-# 		d_LS = np.min(np.abs(data[idx,1]))
-
-# 	else:
-# 		d_LS = np.inf
-
-
-# 	d_obs = np.array([d_LS,d_SDF,d_RS])
-# 	ang = np.array([-np.pi/4,0,np.pi/4])
-
-# 	max_idx = np.argmax(d_obs)
-
-# 	print d_LS,d_SDF,d_RS
-
-	
-	# cent_norm = np.sum(cent_p**2,axis=1)
-
-	# idx = np.arange(n_clusters)
-	# r_idx = np.tile(idx,n_clusters)
-	# l_idx = np.repeat(idx,n_clusters)
-
-	# cent_p_polar
-
-
-
+	# # visualization
 	color = ['r','g','b','k']
 	
+	# plotting clusters
 	ax = fig.add_subplot(111)
 	ax.set_xlim((-10,10))
 	ax.set_ylim((10,10))
@@ -225,17 +147,15 @@ def scan_callback(data):
 		plt.plot(scan_x[label==i],scan_y[label==i],color[i]+'o',mew=0.1)
 		plt.hold(True)
 
-	# ax.plot(cent[:,0],cent[:,1],'yx',ms=20, mew=10)
+	# plotting centroids & gap center
 	ax.plot(cent_p[:,0],cent_p[:,1],'bx',ms=20, mew=10)
 	ax.plot(gap_center.x,gap_center.y,'kx',ms=20, mew=10)
 	plt.hold(False)
 
 	plt.show()
-
-	
 	plt.pause(0.001)
 
-
+	# publishing data
 	msg = drive_param()
 	msg.velocity = 0.05  # TODO: implement PID for velocity
 	msg.angle = 0    # TODO: implement PID for steering angle
