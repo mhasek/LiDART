@@ -1,8 +1,0 @@
-prefix=/home/mhasek/Documents/ESE680/Lidar_lab/lidar_lab_ws/devel
-
-Name: LiDART_gap_finding
-Description: Description of LiDART_gap_finding
-Version: 0.0.0
-Cflags: 
-Libs: -L/home/mhasek/Documents/ESE680/Lidar_lab/lidar_lab_ws/devel/lib 
-Requires: 

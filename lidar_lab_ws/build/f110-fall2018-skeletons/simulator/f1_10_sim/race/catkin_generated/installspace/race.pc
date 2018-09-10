@@ -1,8 +1,0 @@
-prefix=/home/mhasek/Documents/ESE680/Lidar_lab/lidar_lab_ws/install
-
-Name: race
-Description: Description of race
-Version: 0.0.0
-Cflags: -I/home/mhasek/Documents/ESE680/Lidar_lab/lidar_lab_ws/install/include
-Libs: -L/home/mhasek/Documents/ESE680/Lidar_lab/lidar_lab_ws/install/lib 
-Requires: roscpp rospy sensor_msgs std_msgs geometry_msgs

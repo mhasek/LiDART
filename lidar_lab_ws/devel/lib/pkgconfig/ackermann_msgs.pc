@@ -1,8 +1,0 @@
-prefix=/home/mhasek/Documents/ESE680/Lidar_lab/lidar_lab_ws/devel
-
-Name: ackermann_msgs
-Description: Description of ackermann_msgs
-Version: 1.0.1
-Cflags: -I/home/mhasek/Documents/ESE680/Lidar_lab/lidar_lab_ws/devel/include -I/usr/include
-Libs: -L/home/mhasek/Documents/ESE680/Lidar_lab/lidar_lab_ws/devel/lib 
-Requires: message_runtime std_msgs

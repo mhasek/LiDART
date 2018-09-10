@@ -1,8 +1,0 @@
-prefix=/home/mhasek/Documents/ESE680/Lidar_lab/lidar_lab_ws/install
-
-Name: serial
-Description: Description of serial
-Version: 1.2.1
-Cflags: -I/home/mhasek/Documents/ESE680/Lidar_lab/lidar_lab_ws/install/include
-Libs: -L/home/mhasek/Documents/ESE680/Lidar_lab/lidar_lab_ws/install/lib -lserial -lrt -lpthread
-Requires: 
