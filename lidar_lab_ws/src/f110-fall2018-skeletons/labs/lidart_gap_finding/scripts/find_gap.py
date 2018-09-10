@@ -52,7 +52,6 @@ def scan_callback(data):
 	scan_y = scans*np.sin(thetas)
 	data_xy = np.hstack((scan_x,scan_y))
 
-
 	dbscan = DBSCAN(eps=2).fit(data_xy)
 
 	label = dbscan.labels_
@@ -150,6 +149,8 @@ def scan_callback(data):
 	# plotting centroids & gap center
 	ax.plot(cent_p[:,0],cent_p[:,1],'bx',ms=20, mew=10)
 	ax.plot(gap_center.x,gap_center.y,'kx',ms=20, mew=10)
+	plt.sca(ax)
+	plt.arrow(0,0,0.5,0,color='red',linewidth=10)
 	plt.hold(False)
 
 	plt.show()
