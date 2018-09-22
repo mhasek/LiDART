@@ -14,13 +14,16 @@ from sklearn.mixture import GaussianMixture as GMM
 from matplotlib.patches import Ellipse
 from sklearn.cluster import DBSCAN
 from visualization_msgs.msg import Marker
+from std_msgs.msg import ColorRGBA
 
 # initialize publishers
 pub_dp = rospy.Publisher('/drive_parameters', drive_param, queue_size=1)
 pub_gc = rospy.Publisher('/gap_center', Vector3, queue_size=1)
 pub_g = rospy.Publisher('/lidar_gap', gaps, queue_size=1)
 pub_m = rospy.Publisher('/Gaps_Marker', Marker, queue_size=1)
-pub_mobs = rospy.Publisher('/Obs_Marker', Marker, queue_size=1)
+pub_obs = rospy.Publisher('/Obs_Marker', Marker, queue_size=1)
+pub_cntrs = rospy.Publisher('/Cntrs_Marker', Marker, queue_size="1")
+
 
 ## Helper function##
 # helper function for polar to cartesian coordinates conversion
@@ -183,6 +186,22 @@ def scan_callback(data):
 	gap_center.z = 0
 
 	############ set up marker #############
+	publish_gaps_marker(gaps_data)
+	publish_obs_marker(obs_bound_cart)
+	publish_gap_center(gap_center)
+
+	## Publish messages
+	# publishing data
+	msg = drive_param()
+	msg.velocity = 0.05  # TODO: implement PID for velocity
+	msg.angle = 0    # TODO: implement PID for steering angle
+	pub_dp.publish(msg)
+	pub_g.publish(gaps_data)
+	pub_gc.publish(gap_center)
+
+def publish_gaps_marker(gaps_data):
+	global pub_m
+	
 	Gaps_Marker = Marker()
 
 	Gaps_Marker.header.frame_id = "/laser"
@@ -210,7 +229,9 @@ def scan_callback(data):
 		p.z = 0
 		Gaps_Marker.points.append(p)
 
+	pub_m.publish(Gaps_Marker)
 
+def publish_obs_marker(obs_bound_cart):
 	Obs_Marker = Marker()
 
 	Obs_Marker.header.frame_id = "/laser"
@@ -238,19 +259,26 @@ def scan_callback(data):
 		Obs_Marker.points.append(p1)
 		Obs_Marker.points.append(p2)
 
-	########################################
+	pub_obs.publish(Obs_Marker)
 
-	## Publish messages
-	# publishing data
-	msg = drive_param()
-	msg.velocity = 0.05  # TODO: implement PID for velocity
-	msg.angle = 0    # TODO: implement PID for steering angle
-	pub_dp.publish(msg)
-	pub_g.publish(gaps_data)
-	pub_gc.publish(gap_center)
-	pub_m.publish(Gaps_Marker)
-	pub_mobs.publish(Obs_Marker)
+def publish_gap_center(gap_center):
+	marker = Marker()
+	marker.header.frame_id = "/laser"
+	marker.pose.position.x = gap_center.x
+	marker.pose.position.y = gap_center.y
+	marker.pose.position.z = gap_center.z # or set this to 0
 
+	marker.type = marker.SPHERE
+
+	marker.scale.x = 0.2 # If marker is too small in Rviz can make it bigger here
+	marker.scale.y = 0.2
+	marker.scale.z = 0.2
+	marker.color.a = 1.0
+	marker.color.r = 1.0
+	marker.color.g = 1.0
+	marker.color.b = 0.0
+
+	pub_cntrs.publish(marker)
 
 ## Main Program ##
 # Boilerplate code to start this ROS node.
