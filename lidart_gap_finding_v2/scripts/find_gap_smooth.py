@@ -89,8 +89,8 @@ def scan_callback(data):
 
 	n_clusters = len(np.unique(label))
 
+	gap_center = Vector3()
 	if n_clusters == 0:
-		gap_center = Vector3()
 		gap_center.x = OAT
 		gap_center.y = 0
 		gap_center.z = 0
@@ -180,6 +180,13 @@ def scan_callback(data):
 	## set up markers ##
 	publish_gaps_marker(gaps_data)
 	publish_obs_marker(obs_bound_cart)
+
+	# about the center
+	gap_center = Vector3()
+	gap_center.x = (gaps_data.x1[gap_idx] + gaps_data.x2[gap_idx])/2
+	gap_center.y = (gaps_data.y1[gap_idx] + gaps_data.y2[gap_idx])/2
+	gap_center.z = 0
+	pub_gc.publish(gap_center)
 	publish_cntrs_marker(gap_center)
 
 	## Publish messages
@@ -188,8 +195,7 @@ def scan_callback(data):
 	msg.velocity = 0.05  # TODO: implement PID for velocity
 	msg.angle = 0    # TODO: implement PID for steering angle
 	pub_dp.publish(msg)
-	# publish /gap_center and /gaps_data
-	publish_gap_center(gaps_data, gap_idx)
+	# publish /gaps_data
 	pub_g.publish(gaps_data)
 	
 
@@ -206,7 +212,6 @@ def find_gap_center_index(gaps_data):
 	g_x2 = np.array(gaps_data.x2)
 	g_y1 = np.array(gaps_data.y1)
 	g_y2 = np.array(gaps_data.y2)
-
 
 	# sort the gaps by width of euc_length and angle threshold
 	sorted_indices = g_len_ang.argsort()
@@ -229,14 +234,6 @@ def find_gap_center_index(gaps_data):
 
 	# otherwise, find the index of the widest gap
 	return np.argmax(g_len_ang)
-
-############ functions to publish messages #############
-def publish_gap_center(gaps_data, gap_idx):
-	gap_center = Vector3()
-	gap_center.x = (gaps_data.x1[gap_idx] + gaps_data.x2[gap_idx])/2
-	gap_center.y = (gaps_data.y1[gap_idx] + gaps_data.y2[gap_idx])/2
-	gap_center.z = 0
-	pub_gc.publish(gap_center)
 
 ############ functions to set up markers #############
 def publish_gaps_marker(gaps_data):
