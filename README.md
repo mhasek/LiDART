@@ -13,6 +13,6 @@ As part of ESE680 Autonomous Driving class at University of Pennsylvania.
 
 # Gallery
 - Racecar
-![Racecar](images/racecar.JPG?raw=true)
+![Racecar](images/racecar-3.JPG?raw=true)
 - Gap Finding
 ![Gap Finding](images/gap_finding.PNG?raw=true)
