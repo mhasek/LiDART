@@ -16,11 +16,22 @@ MIN_DISTANCE = 0.1
 MAX_DISTANCE = 30.0
 MIN_ANGLE = -45.0
 MAX_ANGLE = 225.0
+A_ANGLE = 45
+B_ANGLE = 90
+DESIRED_DISTANCE = 0.05
 
 # data: single message from topic /scan
 # angle: between -45 to 225 degrees, where 0 degrees is directly to the right
 # Outputs length in meters to object with angle in lidar scan field of view
-def getRange(data, angle, angle_index):
+def getRange(data, angle):
+  scans = np.array(data.ranges)
+  theta_min = data.angle_min
+  theta_max = data.angle_max
+  theta_delta = data.angle_increment/2.0
+  r_min = data.range_min
+  r_max = data.range_max
+  thetas = np.arange(theta_min,theta_max,theta_delta)
+  angle_index = find_nearest(thetas, angle)
   range_val = data.ranges[angle_index]
   return range_val
 
@@ -36,35 +47,21 @@ def followLeft(data, desired_distance):
 # Outputs the PID error required to make the car follow the right wall.
 def followRight(data, desired_distance):
 
-  # NOTE: The lines below initialize the values
-  scans = np.array(data.ranges)
-  theta_min = data.angle_min
-  theta_max = data.angle_max
-  theta_delta = (theta_max - theta_min)/len(scans)
-  r_min = data.range_min
-  r_max = data.range_max
-
-  thetas = np.arange(theta_min,theta_max,theta_delta)
-  a_index = find_nearest(thetas, np.deg2rad(45)) # the angle that we want to measure a at
-  angle = thetas[a_index] # 45 degrees
-  a_theta = thetas[a_index]
-
-  b_index = find_nearest(thetas, np.deg2rad(90))
-  b_theta = thetas[b_index]
-
-  a = getRange(data, a_theta, a_index)
-  b = getRange(data, b_theta, b_index)
+  # NOTE: The lines below initialize the value
+  # a_index = find_nearest(thetas, np.deg2rad(45)) # the angle that we want to measure a at
+  # angle = thetas[a_index] # 45 degrees
+  a = getRange(data, A_ANGLE)
+  b = getRange(data, B_ANGLE)
 
   # Figure out the angle, alpha, Dt using the equations given to us
-  theta_diff = a_theta - b_theta
+  theta_diff = A_ANGLE - B_ANGLE
   alpha = np.arctan(a*np.cos(theta_diff) - b)/(a*np.sin(theta_diff))
   Dt = b*np.cos(alpha)
 
-  # Once again, a given equation
-  error = desired_distance - Dt
-
   L = 0.1 # Arbitrary lookahead distance (chnage this)
   Dt_next = Dt + L*np.sin(alpha)
+
+  error = desired_distance - Dt_next
 
   return error
 
@@ -86,9 +83,9 @@ def find_nearest(array, value):
 def scan_callback(data):
 
   error = 0.0 # TODO: replace with followLeft, followRight, or followCenter
-  desired_distance = 0.2 # Randomly decide
+  desired_distance = DESIRED_DISTANCE # Randomly decide
   error = followRight(data, desired_distance)
-
+  print(error)
   msg = Float64()
   msg.data = error
   pub.publish(msg)
