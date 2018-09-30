@@ -54,7 +54,7 @@ find_package(Boost REQUIRED)
 ## Generate messages in the 'msg' folder
 add_message_files(
   DIRECTORY msg
-  FILES drive_param.msg drive_values.msg pid_analysis.msg pid_input.msg
+  FILES drive_param.msg drive_values.msg pid_analysis.msg pid_input.msg wall_following_analysis.msg
 )
 
 ## Generate services in the 'srv' folder
@@ -201,3 +201,7 @@ include_directories(include ${catkin_INCLUDE_DIRS})
 
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
+
+add_executable(lidart_analysis_node src/lidart_analysis.cpp)
+target_link_libraries(lidart_analysis_node ${catkin_LIBRARIES})
+add_dependencies(lidart_analysis_node lidart_wall_following_generate_messages_cpp)

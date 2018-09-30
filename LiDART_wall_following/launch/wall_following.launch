@@ -9,8 +9,9 @@
 
   # output="screen" allows us to see print statements
   <node pkg="lidart_wall_following" name="pid_error_node" type="pid_error.py" output="screen"/>
+  <node pkg="lidart_wall_following" name="lidart_analysis_node" type="lidart_analysis_node" output="screen"/>
   <node pkg="lidart_wall_following" name="control_node" type="control.py" output="screen"/>
-  <node pkg="lidart_wall_following" name="lidart_analysis_node" type="lidart_analysis.py" output="screen"/>
+  <!-- <node pkg="lidart_wall_following" name="lidart_analysis_node" type="lidart_analysis.py" output="screen"/> -->
   <node pkg="lidart_wall_following" name="sim_connector_node" type="sim_connector.py" output="screen"/>
 
 </launch>

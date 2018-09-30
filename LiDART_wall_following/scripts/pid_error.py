@@ -21,7 +21,8 @@ B_ANGLE = 90
 C_ANGLE = -45
 D_ANGLE = -90
 
-DESIRED_DISTANCE = 1.2
+OAT = 8
+DESIRED_DISTANCE = 0.7
 L = 0.25 # Arbitrary lookahead distance (chnage this)
 
 # data: single message from topic /scan
@@ -34,16 +35,11 @@ def getRange(data, angle):
   theta_delta = data.angle_increment
   r_min = data.range_min
   r_max = data.range_max
-  # limit scan values within range
-  idx = (scans > r_min) & (scans < r_max)
-
-  # generate a matrix to correspond angles with ranges
-  thetas = np.arange(theta_min,theta_max,theta_delta)
-  scans = scans[idx].reshape(-1,1)
-  thetas = thetas[idx].reshape(-1,1)
   thetas = np.arange(theta_min,theta_max,theta_delta)
   angle_index = find_nearest(thetas, np.deg2rad(angle))
-  range_val = data.ranges[angle_index]
+  # cap infinite values at OAT
+  range_val = data.ranges[angle_index] if data.ranges[angle_index] < OAT else OAT
+  
   return range_val
 
 # data: single message from topic /scan
