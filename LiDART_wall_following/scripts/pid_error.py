@@ -18,7 +18,11 @@ MIN_ANGLE = -45.0
 MAX_ANGLE = 225.0
 A_ANGLE = 45
 B_ANGLE = 90
-DESIRED_DISTANCE = 0.05
+C_ANGLE = -45
+D_ANGLE = -90
+
+DESIRED_DISTANCE = 0.3
+L = 2 # Arbitrary lookahead distance (chnage this)
 
 # data: single message from topic /scan
 # angle: between -45 to 225 degrees, where 0 degrees is directly to the right
@@ -27,11 +31,11 @@ def getRange(data, angle):
   scans = np.array(data.ranges)
   theta_min = data.angle_min
   theta_max = data.angle_max
-  theta_delta = data.angle_increment/2.0
+  theta_delta = data.angle_increment
   r_min = data.range_min
   r_max = data.range_max
   thetas = np.arange(theta_min,theta_max,theta_delta)
-  angle_index = find_nearest(thetas, angle)
+  angle_index = find_nearest(thetas, np.deg2rad(angle))
   range_val = data.ranges[angle_index]
   return range_val
 
@@ -39,8 +43,25 @@ def getRange(data, angle):
 # desired_distance: desired distance to the left wall [meters]
 # Outputs the PID error required to make the car follow the left wall.
 def followLeft(data, desired_distance):
-  # TODO: implement
-  return 0.0
+  a = getRange(data, C_ANGLE)
+  b = getRange(data, D_ANGLE)
+
+  # Figure out the angle, alpha, Dt using the equations given to us
+  theta_diff = np.deg2rad(C_ANGLE - D_ANGLE)
+  # pdb.set_trace()
+  alpha = np.arctan(a*np.cos(theta_diff) - b)/(a*np.sin(theta_diff))
+  Dt = b*np.cos(alpha)
+
+  
+  Dt_next = Dt + L*np.sin(alpha)
+
+  error = desired_distance - Dt_next
+
+  print "error: ",error
+  print "angle: ",alpha
+
+  return error
+
 
 # data: single message from topic /scan
 # desired_distance: desired distance to the right wall [meters]
@@ -54,14 +75,18 @@ def followRight(data, desired_distance):
   b = getRange(data, B_ANGLE)
 
   # Figure out the angle, alpha, Dt using the equations given to us
-  theta_diff = A_ANGLE - B_ANGLE
+  theta_diff = np.deg2rad(B_ANGLE - A_ANGLE)
+  # pdb.set_trace()
   alpha = np.arctan(a*np.cos(theta_diff) - b)/(a*np.sin(theta_diff))
   Dt = b*np.cos(alpha)
 
-  L = 0.1 # Arbitrary lookahead distance (chnage this)
+  
   Dt_next = Dt + L*np.sin(alpha)
 
-  error = desired_distance - Dt_next
+  error = Dt_next - desired_distance
+
+  print "error: ",error
+  print "angle: ",alpha
 
   return error
 
@@ -69,8 +94,38 @@ def followRight(data, desired_distance):
 # Outputs the PID error required to make the car drive in the middle
 # of the hallway.
 def followCenter(data):
-  # TODO: implement
-  return 0.0
+  
+  a = getRange(data, A_ANGLE)
+  b = getRange(data, B_ANGLE)
+
+  # Figure out the angle, alpha, Dt using the equations given to us
+  theta_diff = np.deg2rad(B_ANGLE - A_ANGLE)
+  # pdb.set_trace()
+  alpha = np.arctan(a*np.cos(theta_diff) - b)/(a*np.sin(theta_diff))
+  Dt = b*np.cos(alpha)
+
+  
+  Dt_next_r = Dt + L*np.sin(alpha)
+
+  a = getRange(data, C_ANGLE)
+  b = getRange(data, D_ANGLE)
+
+  # Figure out the angle, alpha, Dt using the equations given to us
+  theta_diff = np.deg2rad(C_ANGLE - D_ANGLE)
+  # pdb.set_trace()
+  alpha = np.arctan(a*np.cos(theta_diff) - b)/(a*np.sin(theta_diff))
+  Dt = b*np.cos(alpha)
+
+  
+  Dt_next_l = Dt + L*np.sin(alpha)
+
+
+  D_total = Dt_next_r + Dt_next_l 
+
+  error = Dt_next_r - D_total/2
+
+  return error
+
 
 # This method finds the index of value nearest to array
 def find_nearest(array, value):
@@ -83,9 +138,9 @@ def find_nearest(array, value):
 def scan_callback(data):
 
   error = 0.0 # TODO: replace with followLeft, followRight, or followCenter
-  desired_distance = DESIRED_DISTANCE # Randomly decide
-  error = followRight(data, desired_distance)
-  print(error)
+  error = followCenter(data)
+  # error = followRight(data, DESIRED_DISTANCE)
+  # error = followLeft(data, DESIRED_DISTANCE)
   msg = Float64()
   msg.data = error
   pub.publish(msg)

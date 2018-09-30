@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(wall_following)
+project(lidart_wall_following)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
@@ -11,7 +11,12 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   std_msgs
+  geometry_msgs
+  message_generation
 )
+
+find_package(Boost REQUIRED)
+
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -47,11 +52,10 @@ find_package(catkin REQUIRED COMPONENTS
 ##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
 
 ## Generate messages in the 'msg' folder
-# add_message_files(
-#   FILES
-#   Message1.msg
-#   Message2.msg
-# )
+add_message_files(
+  DIRECTORY msg
+  FILES drive_param.msg drive_values.msg pid_analysis.msg pid_input.msg
+)
 
 ## Generate services in the 'srv' folder
 # add_service_files(
@@ -68,6 +72,7 @@ find_package(catkin REQUIRED COMPONENTS
 # )
 
 ## Generate added messages and services with any dependencies listed here
+generate_messages(DEPENDENCIES std_msgs geometry_msgs)
 # generate_messages(
 #   DEPENDENCIES
 #   std_msgs
@@ -107,6 +112,8 @@ catkin_package(
 #  LIBRARIES wall_following
 #  CATKIN_DEPENDS roscpp rospy std_msgs
 #  DEPENDS system_lib
+ CATKIN_DEPENDS roscpp rospy std_msgs geometry_msgs message_runtime
+ DEPENDS system_lib Boost
 )
 
 ###########
@@ -115,10 +122,7 @@ catkin_package(
 
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
-include_directories(
-# include
-  ${catkin_INCLUDE_DIRS}
-)
+include_directories(include ${catkin_INCLUDE_DIRS})
 
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}

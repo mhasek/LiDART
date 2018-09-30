@@ -1,0 +1,2 @@
+float32 pid_error_ave
+float32 pid_error_max
