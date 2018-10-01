@@ -10,6 +10,7 @@ from std_msgs.msg import Float64
 import pdb
 
 pub = rospy.Publisher('pid_error', Float64, queue_size=10)
+pub_dist = rospy.Publisher('curr_distance', Float64, queue_size=10)
 
 # You can define constants in Python as uppercase global names like these.
 MIN_DISTANCE = 0.1
@@ -118,7 +119,7 @@ def followCenter(data):
   # pdb.set_trace()
   alpha = np.arctan(a*np.cos(theta_diff) - b)/(a*np.sin(theta_diff))
   Dt = b*np.cos(alpha)
-
+  
 
   Dt_next_l = Dt + L*np.sin(alpha)
 

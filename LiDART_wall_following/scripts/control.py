@@ -7,8 +7,8 @@ import numpy as np
 import pdb
 
 # TODO: modify these constants to make the car follow walls smoothly.
-KP = 0.6
-KD = 0.1
+KP = 2.5
+KD = 1.0
 
 dt = 0.025
 

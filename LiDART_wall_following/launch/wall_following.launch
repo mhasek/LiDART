@@ -7,7 +7,8 @@
       <arg name="racecar_version" value="racecar-v2" />
   </include>
 
-  # output="screen" allows us to see print statements
+  <node pkg="rqt_plot" name="rqt_plot" type="rqt_plot" output="screen"/>
+  <!-- output="screen" allows us to see print statements -->
   <node pkg="lidart_wall_following" name="pid_error_node" type="pid_error.py" output="screen"/>
   <node pkg="lidart_wall_following" name="lidart_analysis_node" type="lidart_analysis_node" output="screen"/>
   <node pkg="lidart_wall_following" name="control_node" type="control.py" output="screen"/>
