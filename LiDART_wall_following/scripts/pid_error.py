@@ -7,7 +7,9 @@ import yaml
 import sys
 from sensor_msgs.msg import LaserScan
 from std_msgs.msg import Float64
+from std_msgs.msg import Int32
 import pdb
+from track_parser import Direction
 
 pub = rospy.Publisher('pid_error', Float64, queue_size=10)
 pub_dist = rospy.Publisher('curr_distance', Float64, queue_size=10)
@@ -21,6 +23,12 @@ A_ANGLE = 45
 B_ANGLE = 90
 C_ANGLE = -45
 D_ANGLE = -90
+
+# Global driving instruction booleans
+# Exactly one of these should be true at a time
+global followingLeft
+global followingRight
+global followingCenter
 
 OAT = 8
 DESIRED_DISTANCE = 0.7
@@ -61,9 +69,6 @@ def followRight(data, desired_distance):
 
   error = desired_distance - Dt_next
 
-  print "error: ",error
-  print "angle: ",alpha
-
   return error
 
 
@@ -88,9 +93,6 @@ def followLeft(data, desired_distance):
   Dt_next = Dt + L*np.sin(alpha)
 
   error = Dt_next - desired_distance
-
-  print "error: ",error
-  print "angle: ",alpha
 
   return error
 
@@ -130,6 +132,16 @@ def followCenter(data):
 
   return error
 
+# Execute different driving strategies and return the resulting error
+def followInstructions(data, desired_distance):
+  if followingCenter:
+    return followCenter(data)
+  elif followingLeft:
+    return followLeft(data, desired_distance)
+  elif followingRight:
+    return followRight(data, desired_distance)
+
+
 
 # This method finds the index of value nearest to array
 def find_nearest(array, value):
@@ -140,18 +152,43 @@ def find_nearest(array, value):
 # Callback for receiving LIDAR data on the /scan topic.
 # data: the LIDAR data, published as a list of distances to the wall.
 def scan_callback(data):
-
-  error = 0.0 # TODO: replace with followLeft, followRight, or followCenter
-  error = followLeft(data, DESIRED_DISTANCE)
+  error = followInstructions(data, DESIRED_DISTANCE)
+  # error = followLeft(data, DESIRED_DISTANCE)
   # error = followRight(data, DESIRED_DISTANCE)
   # error = followLeft(data, DESIRED_DISTANCE)
   msg = Float64()
   msg.data = error
   pub.publish(msg)
 
+# Takes next command and sets driving instruction booleans accordingly
+def command_callback(next_command):
+  global followingRight
+  global followingLeft
+  global followingCenter
+  if next_command == Direction.LEFT:
+    followingLeft = True
+    followingRight = False
+    followingCenter = False
+  if next_command == Direction.RIGHT:
+    followingLeft = False
+    followingRight = True
+    followingCenter = False
+  if next_command == Direction.CENTER:
+    followingLeft = False
+    followingRight = False
+    followingCenter = True
+
+
 # Boilerplate code to start this ROS node.
 # DO NOT MODIFY!
 if __name__ == '__main__':
-	rospy.init_node('pid_error_node', anonymous = True)
-	rospy.Subscriber("scan", LaserScan, scan_callback)
-	rospy.spin()
+  global followingCenter
+  global followingLeft
+  global followingRight
+  followingCenter = True
+  followingLeft = False
+  followingRight = False
+  rospy.init_node('pid_error_node', anonymous = True)
+  rospy.Subscriber("scan", LaserScan, scan_callback)
+  rospy.Subscriber("command", Int32, command_callback)
+  rospy.spin()
