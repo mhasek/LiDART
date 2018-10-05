@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <launch>
   <include file="$(find racecar_gazebo)/launch/racecar.launch">
-	<arg name="world_name" value="track_levine"/>
+	   <arg name="world_name" value="track_levine"/>
   </include>
-    <include file="$(find racecar)/launch/includes/common/joy_teleop.launch.xml" >
+  <include file="$(find racecar)/launch/includes/common/joy_teleop.launch.xml" >
       <arg name="racecar_version" value="racecar-v2" />
   </include>
 
@@ -13,5 +13,12 @@
   <node pkg="lidart_wall_following" name="pid_error_node" type="pid_error.py" output="screen"/>
   <node pkg="lidart_wall_following" name="control_node" type="control.py" output="screen"/>
   <node pkg="lidart_wall_following" name="sim_connector_node" type="sim_connector.py" output="screen"/>
+  
+  <node pkg="lidart_gap_finding" name="find_gap_node" type="find_gap_smooth.py" output="screen"/>
+  <node pkg="lidart_wall_following" name="find_intersection_node" type="find_intersection_node" output="screen"/>
+  <node pkg="lidart_wall_following" name="track_parser_node" type="track_parser.py" output="screen"/>
+
+  <node pkg="rviz" name="rviz" type="rviz" output="screen"/>
+  <!-- <node pkg="rqt_console" name="rqt_console" type="rqt_console" output="screen"/> -->
 
 </launch>

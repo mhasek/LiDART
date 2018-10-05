@@ -205,3 +205,7 @@ include_directories(include ${catkin_INCLUDE_DIRS})
 add_executable(lidart_analysis_node src/lidart_analysis.cpp)
 target_link_libraries(lidart_analysis_node ${catkin_LIBRARIES})
 add_dependencies(lidart_analysis_node lidart_wall_following_generate_messages_cpp)
+
+add_executable(find_intersection_node src/find_intersection.cpp)
+target_link_libraries(find_intersection_node ${catkin_LIBRARIES})
+add_dependencies(find_intersection_node lidart_wall_following_generate_messages_cpp)

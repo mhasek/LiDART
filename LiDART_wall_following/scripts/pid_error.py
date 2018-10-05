@@ -12,7 +12,7 @@ import pdb
 from track_parser import Direction
 
 pub = rospy.Publisher('pid_error', Float64, queue_size=10)
-pub_dist = rospy.Publisher('curr_distance', Float64, queue_size=10)
+# pub_dist = rospy.Publisher('curr_distance', Float64, queue_size=10)
 
 # You can define constants in Python as uppercase global names like these.
 MIN_DISTANCE = 0.1
@@ -31,7 +31,7 @@ global followingRight
 global followingCenter
 
 OAT = 8
-DESIRED_DISTANCE = 0.7
+DESIRED_DISTANCE = 0.3
 L = 0.25 # Arbitrary lookahead distance (chnage this)
 
 # data: single message from topic /scan

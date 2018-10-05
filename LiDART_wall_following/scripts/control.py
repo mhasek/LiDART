@@ -7,11 +7,13 @@ import numpy as np
 import pdb
 
 # TODO: modify these constants to make the car follow walls smoothly.
-KP = 2.5
+#KP = 2.5
+#KD = 1.0
+
+KP = 4.0
 KD = 1.0
 
 dt = 0.025
-
 
 e_t0 = 0.0
 e_t1 = 0.0
@@ -41,7 +43,7 @@ def control_callback(data):
   msg = drive_param()
   msg.velocity = vel  # TODO: implement PID for velocity
   msg.angle = u    # TODO: implement PID for steering angle
-  print msg
+  # print msg
   pub.publish(msg)
   e_t0 = data.data
 

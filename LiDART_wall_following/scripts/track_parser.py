@@ -1,8 +1,11 @@
+#!/usr/bin/env python
+
 import csv
 import rospy
 from std_msgs.msg import Bool
 from std_msgs.msg import Int32
 from enum import Enum
+import rospkg 
 
 class Direction(Enum):
     LEFT = 1
@@ -11,18 +14,18 @@ class Direction(Enum):
 
 # Create a dictionary that maps strings to driving strategies for reading CSV file
 directiondict = {
-    "left": Direction.LEFT,
-    "right": Direction.RIGHT,
-    "center": Direction.CENTER,
-    "straight": Direction.CENTER,
+    "turn_right": Direction.RIGHT,
     "hallway": Direction.CENTER,
-    "forward": Direction.CENTER
+    "turn_left": Direction.LEFT
 }
 
-file_name = "CSV/Test.csv"
-
+rospack = rospkg.RosPack()
+file_name = rospack.get_path('lidart_wall_following')+'/scripts/CSV/Test.csv'
 global csv_array
+
 counter = 0
+prev_flag = False
+current_command = Direction.CENTER
 pub_command = rospy.Publisher('track_command', Int32, queue_size=10)
 
 # Generic CSV reader - creates list of directions composed of "Left, Right, Center" (for now)
@@ -39,20 +42,36 @@ def import_csv(file_name):
 # If the callback recieves "False" publishes "hallway", which also maps to 3
 def intersection_callback(intersection_flag):
     global counter
-    if (intersection_flag):
-        if counter >= len(csv_array):
-            print("You have arrived at your destination")
-            return
-        current_command = csv_array[counter]
-        counter = counter + 1
-        pub_command.publish(current_command)
-    else:
-        pub_command.publish(directiondict["hallway"])
+    global prev_flag
+    global current_command
+    
+    msg = Int32()
 
+    # only read a new line in csv when switching from hallway to intersection
+    if (intersection_flag.data):  
+        if (not prev_flag):
+            if counter >= len(csv_array):
+                print("You have arrived at your destination")
+                return
+            current_command = csv_array[counter] # 0,1,2
+            msg.data = current_command
+            counter = counter + 1
+
+        print "Hi I'm in intersection_flag.data == true"
+        print current_command
+    else:
+        current_command = directiondict["hallway"]
+        print "Hi I'm in intersection_flag.data == false"
+        print current_command
+
+    prev_flag = intersection_flag.data
+    msg.data = current_command
+    print msg.data
+    pub_command.publish(msg)
 
 if __name__ == '__main__':
     # csv_array
     csv_array = import_csv(file_name)
-    rospy.init_node('pid_controller_node', anonymous=True)
+    rospy.init_node('track_parser_node', anonymous=True)
     rospy.Subscriber("intersection", Bool, intersection_callback)
     rospy.spin()

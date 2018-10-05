@@ -17,7 +17,7 @@ from visualization_msgs.msg import Marker
 from std_msgs.msg import ColorRGBA
 
 # initialize publishers
-pub_dp = rospy.Publisher('/drive_parameters', drive_param, queue_size=1)
+# pub_dp = rospy.Publisher('/drive_parameters', drive_param, queue_size=1)
 pub_gc = rospy.Publisher('/gap_center', Vector3, queue_size=1)
 pub_g = rospy.Publisher('/gaps_data', gaps, queue_size=1)
 pub_m = rospy.Publisher('/Gaps_Marker', Marker, queue_size=1)
@@ -139,33 +139,43 @@ def scan_callback(data):
 	gaps_data = gaps()
 	
 	# append LIDAR detection boundaries & obstacle boundaries to the gaps_data message
-	gaps_data.theta1.append(ang_min)
-	gaps_data.r1.append(OAT)
+	# gaps_data.theta1.append(ang_min)
+	# gaps_data.r1.append(OAT)
 
-	x,y = pol2cart(ang_min, OAT)
-	gaps_data.x1.append(x)
-	gaps_data.y1.append(y)
+	# x,y = pol2cart(ang_min, OAT)
+	# gaps_data.x1.append(x)
+	# gaps_data.y1.append(y)
 
+	cnt = 0
 	for obst in obs_bound:
-		gaps_data.theta2.append(obst[0])
-		gaps_data.r2.append(obst[1])
+		if (cnt != 0):
+			gaps_data.theta2.append(obst[0])
+			gaps_data.r2.append(obst[1])
 		
-		gaps_data.theta1.append(obst[2])
-		gaps_data.r1.append(obst[3])
+		if (cnt != len(obs_bound) - 1):
+			gaps_data.theta1.append(obst[2])
+			gaps_data.r1.append(obst[3])
 
+		cnt += 1
+
+	cnt = 0
 	for obst_xy in obs_bound_cart:
-		gaps_data.x2.append(obst_xy[0])
-		gaps_data.y2.append(obst_xy[1])
+		if (cnt != 0):
+			gaps_data.x2.append(obst_xy[0])
+			gaps_data.y2.append(obst_xy[1])
 
-		gaps_data.x1.append(obst_xy[2])
-		gaps_data.y1.append(obst_xy[3])
+		if (cnt != len(obs_bound_cart) - 1):
+			gaps_data.x1.append(obst_xy[2])
+			gaps_data.y1.append(obst_xy[3])
 
-	gaps_data.theta2.append(ang_max)
-	gaps_data.r2.append(OAT)
+		cnt += 1
 
-	x,y = pol2cart(ang_max, OAT)
-	gaps_data.x2.append(x)
-	gaps_data.y2.append(y)
+	# gaps_data.theta2.append(ang_max)
+	# gaps_data.r2.append(OAT)
+
+	# x,y = pol2cart(ang_max, OAT)
+	# gaps_data.x2.append(x)
+	# gaps_data.y2.append(y)
 
 	# find the delta_angle and euclidean length of each gap, and save this information in gaps_data
 	for i in range(len(gaps_data.x1)):
@@ -191,10 +201,10 @@ def scan_callback(data):
 
 	## Publish messages
 	# publish drive param
-	msg = drive_param()
-	msg.velocity = 0.05  # TODO: implement PID for velocity
-	msg.angle = 0    # TODO: implement PID for steering angle
-	pub_dp.publish(msg)
+	# msg = drive_param()
+	# msg.velocity = 0.05  # TODO: implement PID for velocity
+	# msg.angle = 0    # TODO: implement PID for steering angle
+	# pub_dp.publish(msg)
 	# publish /gaps_data
 	pub_g.publish(gaps_data)
 	
