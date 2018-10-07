@@ -6,6 +6,7 @@ from std_msgs.msg import Bool
 from std_msgs.msg import Int32
 from enum import Enum
 import rospkg 
+import pdb
 
 class Direction(Enum):
     LEFT = 1
@@ -52,22 +53,23 @@ def intersection_callback(intersection_flag):
         if (not prev_flag):
             if counter >= len(csv_array):
                 print("You have arrived at your destination")
-                return
+                counter = 0
+                
             current_command = csv_array[counter] # 0,1,2
             msg.data = current_command
             counter = counter + 1
 
-        print "Hi I'm in intersection_flag.data == true"
+        print "Hi I'm at an intersection"
         print current_command
     else:
         current_command = directiondict["hallway"]
-        print "Hi I'm in intersection_flag.data == false"
+        print "Hi I'm in a hallway"
         print current_command
 
     prev_flag = intersection_flag.data
     msg.data = current_command
     print msg.data
-    pub_command.publish(msg)
+    pub_command.publish(msg.data.value)
 
 if __name__ == '__main__':
     # csv_array

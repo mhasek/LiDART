@@ -54,7 +54,7 @@ find_package(Boost REQUIRED)
 # Generate messages in the 'msg' folder
 add_message_files(
   DIRECTORY msg
-  FILES drive_param.msg drive_values.msg gaps.msg pid_input.msg
+  FILES drive_param.msg drive_values.msg gaps.msg pid_input.msg gap.msg
 )
 
 ## Generate services in the 'srv' folder

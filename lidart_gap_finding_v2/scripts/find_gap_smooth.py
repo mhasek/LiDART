@@ -10,11 +10,13 @@ import numpy as np
 import pdb
 from scipy import cluster
 from lidart_gap_finding.msg import gaps
+from lidart_gap_finding.msg import gap
 from sklearn.mixture import GaussianMixture as GMM
 from matplotlib.patches import Ellipse
 from sklearn.cluster import DBSCAN
 from visualization_msgs.msg import Marker
 from std_msgs.msg import ColorRGBA
+import itertools
 
 # initialize publishers
 # pub_dp = rospy.Publisher('/drive_parameters', drive_param, queue_size=1)
@@ -22,11 +24,17 @@ pub_gc = rospy.Publisher('/gap_center', Vector3, queue_size=1)
 pub_g = rospy.Publisher('/gaps_data', gaps, queue_size=1)
 pub_m = rospy.Publisher('/Gaps_Marker', Marker, queue_size=1)
 pub_obs = rospy.Publisher('/Obs_Marker', Marker, queue_size=1)
-pub_cntrs = rospy.Publisher('/Cntrs_Marker', Marker, queue_size="1")
+pub_cntrs = rospy.Publisher('/Cntrs_Marker', Marker, queue_size=1)
 
 # variables for smoothing
 prev_gap_center = Vector3()
 prev_gap_euc_length = 0
+min_gap_len = 0.3
+min_gap_ang = np.deg2rad(10)
+min_gap_dep = 1
+smooth_dist2_th = 0.25
+# initiate obstacle avoidance threshold
+OAT = 3
 
 
 ## Helper function##
@@ -39,6 +47,7 @@ def pol2cart(theta,r):
 # Callback that receives LIDAR data on the /scan topic.
 # data: the LIDAR data, published as sensor_msgs::LaserScan
 def scan_callback(data):
+	global OAT
 	# get scan & angle from received LIDAR data
 	scans = np.array(data.ranges)
 	theta_min = data.angle_min
@@ -54,9 +63,6 @@ def scan_callback(data):
 	thetas = np.arange(theta_min,theta_max,theta_delta)
 	scans = scans[idx].reshape(-1,1)
 	thetas = thetas[idx].reshape(-1,1)
-
-	# initiate obstacle avoidance threshold
-	OAT = 3
 
 	thetas = thetas[scans<=OAT]
 	scans = scans[scans<=OAT]
@@ -137,74 +143,62 @@ def scan_callback(data):
 	## Prepare the message about gaps_data
 	# initialize an empty gap message
 	gaps_data = gaps()
-	
+
 	# append LIDAR detection boundaries & obstacle boundaries to the gaps_data message
-	# gaps_data.theta1.append(ang_min)
-	# gaps_data.r1.append(OAT)
+	g = gap()
 
-	# x,y = pol2cart(ang_min, OAT)
-	# gaps_data.x1.append(x)
-	# gaps_data.y1.append(y)
+	g.theta1 = ang_min
+	g.r1 = OAT
+	g.x1,g.y1 = pol2cart(ang_min, OAT)
 
-	cnt = 0
-	for obst in obs_bound:
-		if (cnt != 0):
-			gaps_data.theta2.append(obst[0])
-			gaps_data.r2.append(obst[1])
-		
-		if (cnt != len(obs_bound) - 1):
-			gaps_data.theta1.append(obst[2])
-			gaps_data.r1.append(obst[3])
+	for obst,obst_xy in itertools.izip(obs_bound,obs_bound_cart):
+			g.theta2 = obst[0]
+			g.r2 = obst[1]
+			g.x2 = obst_xy[0]
+			g.y2 = obst_xy[1]
+			dx = abs(g.x2 - g.x1)
+			dy = abs(g.y2 - g.y1)
+			g.delta_angle = abs(g.theta2 - g.theta1)
+			g.euc_length = (dx**2+dy**2)**0.5
+			g.cx = 0.5*(g.x1 + g.x2)
+			g.cy = 0.5*(g.y1 + g.y2)
+			if (g.euc_length > min_gap_len) and (g.delta_angle > min_gap_ang):
+				gaps_data.data.append(g)
 
-		cnt += 1
+			g = gap()
+			g.theta1 = obst[2]
+			g.r1 = obst[3]
+			g.x1 = obst_xy[2]
+			g.y1 = obst_xy[3]
 
-	cnt = 0
-	for obst_xy in obs_bound_cart:
-		if (cnt != 0):
-			gaps_data.x2.append(obst_xy[0])
-			gaps_data.y2.append(obst_xy[1])
+	g.theta2 = ang_max
+	g.r2 = OAT
+	g.x2,g.y2 = pol2cart(ang_max, OAT)
+	dx = abs(g.x2 - g.x1)
+	dy = abs(g.y2 - g.y1)
+	g.delta_angle = abs(g.theta2 - g.theta1)
 
-		if (cnt != len(obs_bound_cart) - 1):
-			gaps_data.x1.append(obst_xy[2])
-			gaps_data.y1.append(obst_xy[3])
+	g.euc_length = (dx**2+dy**2)**0.5
+	g.cx = 0.5*(g.x1 + g.x2)
+	g.cy = 0.5*(g.y1 + g.y2)
+	if (g.euc_length > min_gap_len) and (g.delta_angle > min_gap_ang):
+		gaps_data.data.append(g)
 
-		cnt += 1
 
-	# gaps_data.theta2.append(ang_max)
-	# gaps_data.r2.append(OAT)
 
-	# x,y = pol2cart(ang_max, OAT)
-	# gaps_data.x2.append(x)
-	# gaps_data.y2.append(y)
-
-	# find the delta_angle and euclidean length of each gap, and save this information in gaps_data
-	for i in range(len(gaps_data.x1)):
-		dx = abs(gaps_data.x2[i] - gaps_data.x1[i])
-		dy = abs(gaps_data.y2[i] - gaps_data.y1[i])
-		gaps_data.delta_angle.append(abs(gaps_data.theta2[i] - gaps_data.theta1[i]))
-		gaps_data.euc_length.append((dx**2+dy**2)**0.5)
 
 	## decide the gap center to use
-	gap_idx = find_gap_center_index(gaps_data)
+	gap_center = find_gap_center(gaps_data)
 
 	## set up markers ##
 	publish_gaps_marker(gaps_data)
 	publish_obs_marker(obs_bound_cart)
 
 	# about the center
-	gap_center = Vector3()
-	gap_center.x = (gaps_data.x1[gap_idx] + gaps_data.x2[gap_idx])/2
-	gap_center.y = (gaps_data.y1[gap_idx] + gaps_data.y2[gap_idx])/2
-	gap_center.z = 0
 	pub_gc.publish(gap_center)
-	publish_cntrs_marker(gap_center)
+	# publish_cntrs_marker(gap_center)
+	publish_cntrs_marker(gaps_data)
 
-	## Publish messages
-	# publish drive param
-	# msg = drive_param()
-	# msg.velocity = 0.05  # TODO: implement PID for velocity
-	# msg.angle = 0    # TODO: implement PID for steering angle
-	# pub_dp.publish(msg)
 	# publish /gaps_data
 	pub_g.publish(gaps_data)
 	
@@ -213,37 +207,30 @@ def scan_callback(data):
 # if the difference between one of the current gap centers and the previous gap center is < 0.5 * prev_gap_euc_length, choose this gap center
 # else, just choose the center of the widest gap
 # TODO: adjust the threshold for choosing closest gap center
-def find_gap_center_index(gaps_data):
-	global prev_gap_center, prev_gap_euc_length
-	g_ang = np.array(gaps_data.delta_angle)
-	g_len = np.array(gaps_data.euc_length)
-	g_len_ang = g_len*(g_ang>0.1)
-	g_x1 = np.array(gaps_data.x1)
-	g_x2 = np.array(gaps_data.x2)
-	g_y1 = np.array(gaps_data.y1)
-	g_y2 = np.array(gaps_data.y2)
+def find_gap_center(gaps_data):
+	global prev_gap_center, prev_gap_euc_length, smooth_dist2_th
+	max_len = 0.
+	min_dist = np.inf
+	gc = Vector3()
+	for i,g in enumerate(gaps_data.data):
+		dist = (prev_gap_center.x - g.cx)**2 + (prev_gap_center.y - g.cy)**2
 
-	# sort the gaps by width of euc_length and angle threshold
-	sorted_indices = g_len_ang.argsort()
-	g_x1 = g_x1[sorted_indices]
-	g_y1 = g_y1[sorted_indices]
-	g_x2 = g_x2[sorted_indices]
-	g_y2 = g_y2[sorted_indices]
+		if dist < smooth_dist2_th and dist < min_dist:
+			min_dist = dist
+			gc.x = g.cx
+			gc.y = g.cy
+			gc.z = 0
+		elif g.euc_length > max_len and min_dist != np.inf:
+			max_len = g.euc_length
+			gc.x = g.cx
+			gc.y = g.cy
+			gc.z = 0
 
-	# for each gap, get gap center and compare with prev_gap_center
-	# stop at the first gap center with distance < prev_euc_length / 2 from prev_gap_center
-	g_centers_x = (g_x1 + g_x2)/2
-	g_centers_y = (g_y1 + g_y2)/2
-	g_centers = np.hstack((g_centers_x.reshape(-1,1), g_centers_y.reshape(-1,1)))
+	if max_len == 0 and min_dist == np.inf:
+		gc.x = OAT
 
-	prev_g_center = np.array((prev_gap_center.x, prev_gap_center.y))
-	for idx in range(len(g_centers)):
-		dist = np.sum((g_centers[idx] - prev_g_center)**2)
-		if (dist < prev_gap_euc_length / 2):
-			return sorted_indices[idx]
-
-	# otherwise, find the index of the widest gap
-	return np.argmax(g_len_ang)
+	return gc
+		
 
 ############ functions to set up markers #############
 def publish_gaps_marker(gaps_data):
@@ -264,15 +251,15 @@ def publish_gaps_marker(gaps_data):
 	Gaps_Marker.color.b = 0
 	Gaps_Marker.color.a = 1
 
-	for i in range(len(gaps_data.x1)):
+	for g in gaps_data.data:
 		p = Point()
-		p.x = gaps_data.x1[i]
-		p.y = gaps_data.y1[i]
+		p.x = g.x1
+		p.y = g.y1
 		p.z = 0
 		Gaps_Marker.points.append(p)
 		p = Point()
-		p.x = gaps_data.x2[i]
-		p.y = gaps_data.y2[i]
+		p.x = g.x2
+		p.y = g.y2
 		p.z = 0
 		Gaps_Marker.points.append(p)
 
@@ -308,14 +295,42 @@ def publish_obs_marker(obs_bound_cart):
 
 	pub_obs.publish(Obs_Marker)
 
-def publish_cntrs_marker(gap_center):
+
+## visualize selected gap center
+# def publish_cntrs_marker(gap_center):
+# 	marker = Marker()
+# 	marker.header.frame_id = "/laser"
+# 	marker.pose.position.x = gap_center.x
+# 	marker.pose.position.y = gap_center.y
+# 	marker.pose.position.z = gap_center.z # or set this to 0
+
+# 	marker.type = marker.SPHERE
+
+# 	marker.scale.x = 0.2 # If marker is too small in Rviz can make it bigger here
+# 	marker.scale.y = 0.2
+# 	marker.scale.z = 0.2
+# 	marker.color.a = 1.0
+# 	marker.color.r = 1.0
+# 	marker.color.g = 1.0
+# 	marker.color.b = 0.0
+
+# 	pub_cntrs.publish(marker)
+
+
+
+# visualize all gap centers
+def publish_cntrs_marker(gaps_data):
 	marker = Marker()
 	marker.header.frame_id = "/laser"
-	marker.pose.position.x = gap_center.x
-	marker.pose.position.y = gap_center.y
-	marker.pose.position.z = gap_center.z # or set this to 0
 
-	marker.type = marker.SPHERE
+	marker.type = marker.POINTS
+
+	for g in gaps_data.data:
+		p = Point()
+		p.x = g.cx
+		p.y = g.cy
+		p.z = 0
+		marker.points.append(p)
 
 	marker.scale.x = 0.2 # If marker is too small in Rviz can make it bigger here
 	marker.scale.y = 0.2

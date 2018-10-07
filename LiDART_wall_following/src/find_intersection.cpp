@@ -3,6 +3,7 @@
 #include "std_msgs/Float32.h"
 #include <vector>
 #include "lidart_gap_finding/gaps.h"
+#include "lidart_gap_finding/gap.h"
 
 int gaps_cnt = 0;
 int prev_gaps_cnt = 0;
@@ -15,11 +16,11 @@ int thres_intersect = 1; //0.125s
 bool curr = false;
 std_msgs::Bool curr_msg;
 
-void gapsCallback(const lidart_gap_finding::gaps gaps_data)
+void gapsCallback(const lidart_gap_finding::gaps::ConstPtr& gaps_data)
 {
-  std::vector<float> gaps_data_delta_angle = gaps_data.delta_angle;
+  // std::vector<lidart_gap_finding::gap> gaps_data_vec = static_cast< std::vector<lidart_gap_finding::gap> > (gaps_data);
   prev_gaps_cnt = gaps_cnt;
-  gaps_cnt = gaps_data_delta_angle.size();
+  gaps_cnt = gaps_data->data.size();
 
   if (gaps_cnt > 1){
     if (prev_gaps_cnt == 1) counter_hallway = 0;
