@@ -22,9 +22,7 @@ pub_m = rospy.Publisher('Wall_Marker', Marker,queue_size = 1)
 # You can define constants in Python as uppercase global names like these.
 MIN_DISTANCE = 0.1
 MAX_DISTANCE = 30.0
-MIN_ANGLE = -45.0
-MAX_ANGLE = 225.0
-A_ANGLE = 45
+A_ANGLE = 45 
 B_ANGLE = 90
 C_ANGLE = -45
 D_ANGLE = -90
@@ -36,11 +34,10 @@ global followingRight
 global followingCenter
 
 OAT = 8
-DESIRED_DISTANCE = 0.3
+DESIRED_DISTANCE = 0.7
 L = 0.25 # Arbitrary lookahead distance (chnage this)
 
 # data: single message from topic /scan
-# angle: between -45 to 225 degrees, where 0 degrees is directly to the right
 # Outputs length in meters to object with angle in lidar scan field of view
 def getRange(data, angle):
   scans = np.array(data.ranges)
@@ -72,7 +69,7 @@ def followRight(data, desired_distance):
 
   Dt_next = Dt + L*np.sin(alpha)
 
-  rth = np.array([[-Dt,D_ANGLE+np.deg2rad(alpha),alpha]])
+  rth = np.array([[a,C_ANGLE],[b,D_ANGLE],[0,0],[Dt,D_ANGLE - alpha_r]])
 
   publish_wall_marker(rth)
 
@@ -100,7 +97,7 @@ def followLeft(data, desired_distance):
 
   Dt_next = Dt + L*np.sin(alpha)
 
-  rth = np.array([[Dt,B_ANGLE+np.deg2rad(alpha),alpha]])
+  rth = np.array([[a,A_ANGLE],[b,B_ANGLE],[0,0],[Dt,B_ANGLE - alpha]])
 
   publish_wall_marker(rth)
 
@@ -125,6 +122,8 @@ def followCenter(data):
 
   Dt_next_l = Dt_l + L*np.sin(alpha_l)
 
+  rth_l = np.array([[a,A_ANGLE],[b,B_ANGLE],[0,0],[Dt_l,B_ANGLE - alpha_l]])
+
   a = getRange(data, C_ANGLE)
   b = getRange(data, D_ANGLE)
 
@@ -136,9 +135,9 @@ def followCenter(data):
 
   Dt_next_r = Dt_r + L*np.sin(alpha_r)
 
-  rth = np.array([[-Dt_r,D_ANGLE+np.deg2rad(alpha_r),alpha_r],[Dt_l,B_ANGLE+np.deg2rad(alpha_l),alpha_l]])
+  rth_r = np.array([[a,C_ANGLE],[b,D_ANGLE],[0,0],[Dt_r,D_ANGLE - alpha_r]])
 
-  publish_wall_marker(rth)
+  publish_wall_marker(np.vstack((rth_r,rth_l)))
 
   D_total = Dt_next_r + Dt_next_l
 
@@ -217,35 +216,12 @@ def publish_wall_marker(r_ths):
 
 	if len(r_ths) > 1:
 
-		for rth in r_ths:
-			p1 = Point()
-			
+		for rth in r_ths:			
 			p2 = Point()
 			p2.x,p2.y = pol2cart(rth[1], rth[0])
 			p2.z = 0
-
-			# x,y = pol2cart(90 + rth[2], rth[0])
-			# p1.x = x + p2.x
-			# p1.y = y + p2.y
-			# p1.z = 0
-
 			
-			Wall_Marker.points.append(p1)
 			Wall_Marker.points.append(p2)
-	else:
-		p1 = Point()
-		
-		p2 = Point()
-		p2.x,p2.y = pol2cart(r_ths[0,1], r_ths[0,0])
-		p2.z = 0
-
-		# x,y = pol2cart(90 + r_ths[0,2], r_ths[0,0])
-		# p1.x = x + p2.x
-		# p1.y = y + p2.y
-		# p1.z = 0
-		
-		Wall_Marker.points.append(p1)
-		Wall_Marker.points.append(p2)
 
 		
 

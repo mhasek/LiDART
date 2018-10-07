@@ -29,9 +29,9 @@ pub_cntrs = rospy.Publisher('/Cntrs_Marker', Marker, queue_size=1)
 # variables for smoothing
 prev_gap_center = Vector3()
 prev_gap_euc_length = 0
-min_gap_len = 0.3
-min_gap_ang = np.deg2rad(10)
-min_gap_dep = 1
+min_gap_len = 1
+min_gap_ang = np.deg2rad(15)
+min_gap_dep = 2
 smooth_dist2_th = 0.25
 # initiate obstacle avoidance threshold
 OAT = 3
@@ -43,6 +43,28 @@ def pol2cart(theta,r):
 	x = r*np.cos(theta)
 	y = r*np.sin(theta)
 	return x,y
+
+def getScanRange(theta1,theta2,data):
+	scans = np.array(data.ranges)
+	theta_min = data.angle_min
+	theta_max = data.angle_max
+	theta_delta = data.angle_increment
+	r_min = data.range_min
+	r_max = data.range_max
+	thetas = np.arange(theta_min,theta_max,theta_delta)
+
+	angle_index1 = find_nearest(thetas, np.deg2rad(theta1))
+	angle_index2 = find_nearest(thetas, np.deg2rad(theta2))
+	# cap infinite values at OAT
+	range_val = scans[angle_index1:angle_index2]
+
+	return range_val
+
+# This method finds the index of value nearest to array
+def find_nearest(array, value):
+	array = np.asarray(array)
+	idx = (np.abs(array - value)).argmin()
+	return idx
 
 # Callback that receives LIDAR data on the /scan topic.
 # data: the LIDAR data, published as sensor_msgs::LaserScan
@@ -73,7 +95,7 @@ def scan_callback(data):
 	scans = scans[(thetas <= ang_max) * (thetas >= ang_min)].reshape(-1,1)
 	thetas = thetas[(thetas <= ang_max) * (thetas >= ang_min)].reshape(-1,1)
 
-	data = np.hstack((thetas,scans))
+	data_pol = np.hstack((thetas,scans))
 
 	# converted to cartesian as well
 	scan_x = scans*np.cos(thetas)
@@ -87,7 +109,7 @@ def scan_callback(data):
 
 	scans = scans[label!=-1]
 	thetas = thetas[label!=-1]
-	data = data[label!=-1,:]
+	data_pol = data_pol[label!=-1,:]
 	scan_x = scan_x[label!=-1]
 	scan_y = scan_y[label!=-1]
 	data_xy = data_xy[label!=-1,:]
@@ -114,7 +136,7 @@ def scan_callback(data):
 	# for each label: 
 	for i,lab_idx in enumerate(np.unique(label)):
 		dat_clus = data_xy[label==lab_idx,:]
-		dat_clus_polar = data[label==lab_idx,:]
+		dat_clus_polar = data_pol[label==lab_idx,:]
 
 		# find the center of the cluster through the closest point to the average of all cluster points
 		cent = np.mean(dat_clus,axis=0) # vertical average
@@ -162,6 +184,8 @@ def scan_callback(data):
 			g.euc_length = (dx**2+dy**2)**0.5
 			g.cx = 0.5*(g.x1 + g.x2)
 			g.cy = 0.5*(g.y1 + g.y2)
+
+			# gap_depths = getScanRange(g.theta1, g.theta2, data)
 			if (g.euc_length > min_gap_len) and (g.delta_angle > min_gap_ang):
 				gaps_data.data.append(g)
 
@@ -181,6 +205,8 @@ def scan_callback(data):
 	g.euc_length = (dx**2+dy**2)**0.5
 	g.cx = 0.5*(g.x1 + g.x2)
 	g.cy = 0.5*(g.y1 + g.y2)
+
+	# gap_depths = getScanRange(g.theta1, g.theta2, data)
 	if (g.euc_length > min_gap_len) and (g.delta_angle > min_gap_ang):
 		gaps_data.data.append(g)
 
