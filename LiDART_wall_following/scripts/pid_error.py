@@ -12,11 +12,16 @@ import pdb
 from track_parser import Direction
 from visualization_msgs.msg import Marker
 from geometry_msgs.msg import Point
+from sensor_msgs.msg import Joy
+from race.msg import drive_param
+
 
 
 
 pub = rospy.Publisher('pid_error', Float64, queue_size=10)
 pub_m = rospy.Publisher('Wall_Marker', Marker,queue_size = 1)
+pub_drive = rospy.Publisher('drive_parameters', drive_param, queue_size=1)
+
 # pub_dist = rospy.Publisher('curr_distance', Float64, queue_size=10)
 
 # You can define constants in Python as uppercase global names like these.
@@ -156,6 +161,8 @@ def followInstructions(data, desired_distance):
     return followLeft(data, desired_distance)
   elif followingRight:
     return followRight(data, desired_distance)
+  else:
+    return 0
 
 
 
@@ -172,9 +179,16 @@ def scan_callback(data):
   # error = followLeft(data, DESIRED_DISTANCE)
   # error = followRight(data, DESIRED_DISTANCE)
   # error = followLeft(data, DESIRED_DISTANCE)
-  msg = Float64()
-  msg.data = error
-  pub.publish(msg)
+  if (followingCenter or followingLeft or followingRight):
+    msg = Float64()
+    msg.data = error
+    pub.publish(msg)
+  else:
+    msg = drive_param()
+    msg.velocity = 0
+    msg.angle = 0
+    pub_drive(msg)
+
 
 # Takes next command and sets driving instruction booleans accordingly
 def command_callback(next_cmd):
@@ -187,14 +201,24 @@ def command_callback(next_cmd):
     followingLeft = True
     followingRight = False
     followingCenter = False
+    print "Turning LEFT"
   if next_command == Direction.RIGHT:
     followingLeft = False
     followingRight = True
     followingCenter = False
+    print "Turning RIGHT"
   if next_command == Direction.CENTER:
     followingLeft = False
     followingRight = False
     followingCenter = True
+    print "Follow CENTER"
+  if next_command == Direction.STOP:
+    followingLeft = False
+    followingRight = False
+    followingCenter = False
+    print "STOP"
+
+
 
 def publish_wall_marker(r_ths):
 	global pub_m

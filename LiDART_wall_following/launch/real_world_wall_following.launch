@@ -3,14 +3,8 @@
 
   <include file="$(find racecar)/launch/teleop.launch"/>
 
-  <node pkg="lidart_wall_following" name="pid_error_node" type="pid_error.py" output="screen"/> 
-  <node pkg="lidart_wall_following" name="control_node" type="control.py" output="screen"/>
-  <node pkg="lidart_wall_following" name="dead_mans_switch" type="dead_mans_switch.py" output="screen"/>
-  <node pkg="lidart_gap_finding" name="find_gap_node" type="find_gap_smooth.py" output="screen"/>
-  <node pkg="lidart_wall_following" name="find_intersection_node" type="find_intersection_node" output="screen"/>
-  <node pkg="lidart_wall_following" name="track_parser_node" type="track_parser.py" output="screen"/>
-
-  <node pkg="rviz" name="rviz" type="rviz" output="screen"/>
-
+  <node pkg="wall_following" name="pid_error_node" type="pid_error.py" output="screen"/> 
+  <node pkg="wall_following" name="control_node" type="control.py" output="screen"/>
+  <node pkg="wall_following" name="dead_mans_switch" type="dead_mans_switch.py" output="screen"/>
 
 </launch>

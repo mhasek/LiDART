@@ -39,6 +39,7 @@ def control_callback(data):
       vel = 1.0
   else:
       vel = 0.5
+      
   u = np.deg2rad(u)
   msg = drive_param()
   msg.velocity = vel  # TODO: implement PID for velocity
