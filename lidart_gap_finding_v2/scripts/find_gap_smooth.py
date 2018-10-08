@@ -29,9 +29,9 @@ pub_cntrs = rospy.Publisher('/Cntrs_Marker', Marker, queue_size=1)
 # variables for smoothing
 prev_gap_center = Vector3()
 prev_gap_euc_length = 0
-min_gap_len = 1
-min_gap_ang = np.deg2rad(15)
-min_gap_dep = 2
+min_gap_len = 0.5
+min_gap_ang = np.deg2rad(10)
+# min_gap_dep = 2
 smooth_dist2_th = 0.25
 # initiate obstacle avoidance threshold
 OAT = 3

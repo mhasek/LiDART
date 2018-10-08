@@ -69,7 +69,7 @@ def followRight(data, desired_distance):
 
   Dt_next = Dt + L*np.sin(alpha)
 
-  rth = np.array([[a,C_ANGLE],[b,D_ANGLE],[0,0],[Dt,D_ANGLE - alpha_r]])
+  rth = np.array([[a,C_ANGLE],[b,D_ANGLE],[0,0],[Dt,D_ANGLE - alpha]])
 
   publish_wall_marker(rth)
 
