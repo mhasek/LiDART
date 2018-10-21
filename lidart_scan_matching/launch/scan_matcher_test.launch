@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<launch>
+  <include file="$(find racecar_gazebo)/launch/racecar.launch">
+	   <arg name="world_name" value="track_levine"/>
+     <arg name="gui" value="false"/>
+  </include>
+  <include file="$(find racecar)/launch/includes/common/joy_teleop.launch.xml" >
+      <arg name="racecar_version" value="racecar-v2" />
+  </include>
+
+  <node pkg="lidart_scan_matching" name="scan_matcher" type="scan_matcher.py" output="screen"/>
+
+  <node pkg="rviz" name="rviz" type="rviz" output="screen"/>
+  <!-- <node pkg="rqt_console" name="rqt_console" type="rqt_console" output="screen"/> -->
+
+</launch>
