@@ -15,7 +15,7 @@ pub = rospy.Publisher('scan_match_location', Point, queue_size=10)
 pub_odom = rospy.Publisher('scan_match_corr_odom_pos', Point, queue_size=10)
 
 # macros
-N = 720
+N = 1081
 
 # Get the real time estimated location, based on the most recent pair of odom_pos and scan
 is_first_time = True
@@ -36,7 +36,7 @@ def real_time_estimated_location():
 
 	# lock that will be unlocked after we receive the first scan
 	while first_scan:
-		print("")
+		print("no first scan")
 
 	while True:
 		curr_scan = process_scan(most_curr_scan)
@@ -68,10 +68,10 @@ def real_time_estimated_location():
 			#print("found q: %0.2f %0.2f %0.2f" % (q[0], q[1], q[2]))
 
 			# use the q to calculate current location
-			# curr_x = curr_x + math.sqrt(q[0]**2 + q[1]**2) * math.cos(curr_direction - q[2])
-			# curr_y = curr_y + math.sqrt(q[0]**2 + q[1]**2) * math.sin(curr_direction - q[2])
-			curr_x = curr_x + math.sqrt(q[0]**2 + q[1]**2) * math.cos(curr_direction + q[2])
-			curr_y = curr_y + math.sqrt(q[0]**2 + q[1]**2) * math.sin(curr_direction + q[2])
+			curr_x = curr_x + math.sqrt(q[0]**2 + q[1]**2) * math.cos(curr_direction - q[2])
+			curr_y = curr_y + math.sqrt(q[0]**2 + q[1]**2) * math.sin(curr_direction - q[2])
+			# curr_x = curr_x + math.sqrt(q[0]**2 + q[1]**2) * math.cos(curr_direction + q[2])
+			# curr_y = curr_y + math.sqrt(q[0]**2 + q[1]**2) * math.sin(curr_direction + q[2])
 			#publish msg
 			msg = Point()
 			msg.x = curr_x
@@ -80,8 +80,8 @@ def real_time_estimated_location():
 			pub.publish(msg)
 
 			# update values
-			# curr_direction = curr_direction - q[2]
-			curr_direction = curr_direction + q[2]
+			curr_direction = curr_direction - q[2]
+			# curr_direction = curr_direction + q[2]
 			prev_scan = curr_scan
 
 			#publish corresponding odom pos
@@ -147,7 +147,9 @@ def process_scan(data):
 # Iteratively find the q that minimizes the error function
 # input: curr_scan, prev_scan
 # output: q = [t_x, t_y, theta]
-threshold = 0.1
+epsilon_xy = 0.3
+epsilon_theta = 0.2
+max_iteration = 30
 prev_q = np.array([0,0,0])
 # debug!
 error_list = []
@@ -158,32 +160,37 @@ def iterative_find_q(curr_scan, prev_scan):
 	global error_2_list
 	# define an initial guess for q_0
 	q = prev_q.copy()
+	best_q = q.copy()
 	# initialize empty C & q
 	C = np.zeros([N,3])
 	prev_C = np.zeros([N,3])
+	best_C = np.zeros([N,3])
 	# k is the cnt of iteration
 	k = 0
 	# initialize error & diff_C to be something big
 	error = N
 	diff_C = sys.float_info.max
-	diff_q = sys.float_info.max
+	diff_q_xy = sys.float_info.max
+	diff_q_theta = sys.float_info.max
 	diff_error = sys.float_info.max
 	prev_error = 0;
+	best_error = sys.float_info.max
+
 	# initialize set of previously seen q
 	seen_q = set()
 
 	# while:
 	# 1. test convergence: diff(C_(k-1),C_(k)) is larger than a threshold 
 	# 2. test cycle (previously seen C)
-	while (abs(diff_error) > threshold):
+	while (diff_q_xy > epsilon_xy or diff_q_theta > epsilon_theta):
 		prev_C = C.copy()
 		prev_q = q.copy()
 		k += 1
 		# print("iteration %d" % k)
 		# C_(k+1) = search_correspondence(curr_scan, prev_scan, q_(k+1))
 		C = search_correspondence(curr_scan, prev_scan, prev_q)
-		print(len(C), len(C[0]))
-		
+
+		# debug
 		error_2 = calculate_error(curr_scan, prev_scan, C, prev_q)
 		error_2_list.append(error_2)
 		# print("iteration %d; error_2: %0.2f" % (k, error_2))
@@ -193,17 +200,28 @@ def iterative_find_q(curr_scan, prev_scan):
 
 		# q_(k+2) = get_q(curr_scan, prev_scan, C_(k+2))
 		q = get_q(curr_scan, prev_scan, C)
-		#diff_q = np.sum((prev_q - q)**2)
-		#print("iteration %d; diff_q: %0.2f" % (k, diff_q))
+		diff_q_xy = np.sqrt(np.sum((prev_q[:2] - q[:2])**2))
+		diff_q_theta = abs(q[2] - prev_q[2])
+		print("iteration %d; diff_q_xy: %0.2f; diff_q_theta: %0.2f" % (k, diff_q_xy, diff_q_theta))
 
 		# calculate error(q_(k+2), C_(k+1))
 		prev_error = error
 		error = calculate_error(curr_scan, prev_scan, C, q)
 		diff_error = error - prev_error
-		print("iteration %d; error: %0.2f; error diff: %0.2f" % (k, error, diff_error))
-		error_list.append(error) # debug
+		if (error < best_error):
+			best_error = error
+			best_C = C
+			best_q = q
+		
+		# debug
+		#print("iteration %d; best_error: %0.2f; error: %0.2f; error diff: %0.2f" % (k, best_error, error, diff_error))
+		error_list.append(error) 
 
 		# pdb.set_trace() # debug
+
+		if (k > max_iteration):
+			print("maximum iteration exceeded")
+			break
 
 		# detect loop
 		q_str = np.array2string(q, precision=2)
@@ -215,8 +233,8 @@ def iterative_find_q(curr_scan, prev_scan):
 		else:
 			seen_q.add(q_str)
 
-	# return q
-	return q
+	# return best_q
+	return best_q
 
 def calculate_error(curr_scan, prev_scan, C, q):
 	project_p2p = np.matmul(rot(q[2]),curr_scan.T).T + np.tile(q[:2], (N,1)) - prev_scan[C[:,1],:]
