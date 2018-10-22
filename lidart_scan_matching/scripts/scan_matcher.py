@@ -6,15 +6,21 @@ import numpy as np
 import yaml
 import sys
 from sensor_msgs.msg import LaserScan
+from nav_msgs.msg import Odometry
 import pdb
 from geometry_msgs.msg import Point
+from queue import *
 
 pub = rospy.Publisher('scan_match_location', Point, queue_size=10)
 
 # macros
-N = 720
+N = 1081
+
+# most current odom & scan
+most_curr_odom_pos = np.zeros([2,1])
 
 # Callback for receiving LIDAR data on the /scan topic.
+# the callback will get the most current odom position, get the estimated 
 # data: the LIDAR data, published as a list of distances to the wall.
 is_first_time = True
 prev_scan = np.array(N)
@@ -22,7 +28,9 @@ curr_scan = np.array(N)
 curr_x = 0 #???is the initial location 0,0?? TODO 
 curr_y = 0 #???is the initial location 0,0?? TODO 
 curr_direction =  0 # initialized to be 0 (pointing in +x) degrees. positive is counter-clockwise
+
 def scan_callback(data):
+
 	global is_first_time
 	global prev_scan
 	global curr_scan
@@ -37,7 +45,7 @@ def scan_callback(data):
 		# given 2 lidar scans, get the q that minimizes the error function
 		q = iterative_find_q(curr_scan, prev_scan)
 
-		print("found q: %d %d %d" % (q[0], q[1], q[2]))
+		print("found q: %0.2f %0.2f %0.2f" % (q[0], q[1], q[2]))
 
 		# use the q to calculate current location
 		curr_x = curr_x + math.sqrt(q[0]**2 + q[1]**2) * math.cos(math.radians(q[2] + curr_direction))
@@ -91,13 +99,14 @@ def process_scan(data):
 # input: curr_scan, prev_scan
 # output: q = [t_x, t_y, theta]
 threshold = 0.1
+prev_q = np.array([0,0,0])
 def iterative_find_q(curr_scan, prev_scan):
+	global prev_q
 	# define an initial guess for q_0
-	q = np.array([0,0,0])
+	q = prev_q.copy()
 	# initialize empty C & q
 	C = np.zeros([N,3])
 	prev_C = np.zeros([N,3])
-	prev_q = np.array([0,0,0])
 	# k is the cnt of iteration
 	k = 0
 	# initialize error & diff_C to be something big
@@ -451,4 +460,5 @@ def getRHS(A,B,Sa,g):
 if __name__ == '__main__':
   rospy.init_node('scan_matcher', anonymous = True)
   rospy.Subscriber("scan", LaserScan, scan_callback)
+  rospy.Subscriber("vesc/odom", Odometry, odom_callback)
   rospy.spin()
