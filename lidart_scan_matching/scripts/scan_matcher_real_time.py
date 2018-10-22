@@ -10,12 +10,13 @@ from nav_msgs.msg import Odometry
 import pdb
 from geometry_msgs.msg import Point
 import matplotlib.pyplot as plt
+import time
 
 pub = rospy.Publisher('scan_match_location', Point, queue_size=10)
 pub_odom = rospy.Publisher('scan_match_corr_odom_pos', Point, queue_size=10)
 
 # macros
-N = 1081
+N = 0
 
 # Get the real time estimated location, based on the most recent pair of odom_pos and scan
 is_first_time = True
@@ -38,7 +39,7 @@ def real_time_estimated_location():
 	while first_scan:
 		print("no first scan")
 
-	while True:
+	while not rospy.is_shutdown():
 		curr_scan = process_scan(most_curr_scan)
 		curr_odom_pos = most_curr_odom_pos
 
@@ -48,7 +49,9 @@ def real_time_estimated_location():
 			error_list = []
 			error_2_list = []
 
+			
 			q = iterative_find_q(curr_scan, prev_scan)
+			time2 = int(round(time.time() * 1000))
 
 			curr_transform = np.matmul(rot(q[2]),curr_scan.T).T + np.tile(q[:2], (N,1))
 
@@ -110,8 +113,10 @@ first_scan = True
 def scan_callback(data):
 	global first_scan
 	global most_curr_scan
+	global N
 
 	if first_scan:
+		N = len(data.ranges)
 		first_scan = False
 	
 	most_curr_scan = data
@@ -147,8 +152,8 @@ def process_scan(data):
 # Iteratively find the q that minimizes the error function
 # input: curr_scan, prev_scan
 # output: q = [t_x, t_y, theta]
-epsilon_xy = 0.3
-epsilon_theta = 0.2
+epsilon_xy = 0.2
+epsilon_theta = 0.1
 max_iteration = 30
 prev_q = np.array([0,0,0])
 # debug!
@@ -188,7 +193,10 @@ def iterative_find_q(curr_scan, prev_scan):
 		k += 1
 		# print("iteration %d" % k)
 		# C_(k+1) = search_correspondence(curr_scan, prev_scan, q_(k+1))
-		C = search_correspondence(curr_scan, prev_scan, prev_q)
+		# C = search_correspondence(curr_scan, prev_scan, prev_q)
+		time1 = int(round(time.time() * 1000))
+		C = search_correspondence_naive(curr_scan, prev_scan, prev_q)
+		time2 = int(round(time.time() * 1000))
 
 		# debug
 		error_2 = calculate_error(curr_scan, prev_scan, C, prev_q)
@@ -199,7 +207,10 @@ def iterative_find_q(curr_scan, prev_scan):
 		# print("iteration %d; diff(prev_C[:,1] - C[:,1]): %0.2f" % (k, diff_C))
 
 		# q_(k+2) = get_q(curr_scan, prev_scan, C_(k+2))
+		time3 = int(round(time.time() * 1000))
 		q = get_q(curr_scan, prev_scan, C)
+		time4 = int(round(time.time() * 1000))
+
 		diff_q_xy = np.sqrt(np.sum((prev_q[:2] - q[:2])**2))
 		diff_q_theta = abs(q[2] - prev_q[2])
 		print("iteration %d; diff_q_xy: %0.2f; diff_q_theta: %0.2f" % (k, diff_q_xy, diff_q_theta))
@@ -214,7 +225,8 @@ def iterative_find_q(curr_scan, prev_scan):
 			best_q = q
 		
 		# debug
-		#print("iteration %d; best_error: %0.2f; error: %0.2f; error diff: %0.2f" % (k, best_error, error, diff_error))
+		print("iteration %d; best_error: %0.2f; error: %0.2f; error diff: %0.2f" % (k, best_error, error, diff_error))
+		print("iteration %d: search_correspondence_naive time: %d; get_q time: %d"%(k, time2-time1, time4-time3))
 		error_list.append(error) 
 
 		# pdb.set_trace() # debug
@@ -246,6 +258,29 @@ def calculate_error(curr_scan, prev_scan, C, q):
 	return project_p2l
 
 # --------------------- HELPER FUNCTIONS RELATED TO SEARCH CORRESPONDENCE ------------------------ #
+def search_correspondence_naive(curr_scan, prev_scan, q):
+	# transformed scan: curr_scan transformed onto prev_scan after transform q
+	transformed_xy = (np.matmul(rot(q[2]), curr_scan.T) + np.tile((q[:2].reshape(-1,1)),(1,N))).T
+	C = np.zeros([N, 3]).astype(int)
+
+	for i in range(N):
+		C[i,0] = i
+		ji1 = closest_node(transformed_xy[i,:],prev_scan)
+		C[i,1] = ji1
+		if (ji1 == 0):
+	  		C[i,2] = 1
+		elif (ji1 == (N-1)):
+	  		C[i,2] = N-2
+		else:
+			C[i,2] = (ji1 - 1) if (np.sum((prev_scan[(ji1-1),:] - transformed_xy[i,:])**2) 
+				< np.sum((prev_scan[ji1+1,:] - transformed_xy[i,:])**2)) else (ji1 + 1)
+	return C
+
+# input: node [1,2], nodes [N,2]
+def closest_node(node, nodes):
+    dist_2 = np.sum((nodes - node)**2, axis=1)
+    return np.argmin(dist_2)
+
 # Search the closest correspondence between curr_scan and prev_scan
 # input: curr_scan, prev_scan: both lidar scans; 
 # q: roto-transformation guess from curr_scan to prev_scan [t_x, t_y, theta], where theta is in radian
