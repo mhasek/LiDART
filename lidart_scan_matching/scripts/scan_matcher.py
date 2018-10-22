@@ -27,6 +27,8 @@ def scan_callback(data):
 	global prev_scan
 	global curr_scan
 	global curr_direction
+	global curr_x
+	global curr_y
 
 	curr_scan = process_scan(data)
 
@@ -34,9 +36,12 @@ def scan_callback(data):
 
 		# given 2 lidar scans, get the q that minimizes the error function
 		q = iterative_find_q(curr_scan, prev_scan)
+
+		print("found q: %d %d %d" % (q[0], q[1], q[2]))
+
 		# use the q to calculate current location
-		curr_x = curr_x + math.sqrt(q[0]**2 + q[1]**2) * math.cos(math.radians(p[2] + curr_direction))
-		curr_y = curr_y + math.sqrt(q[0]**2 + q[1]**2) * math.sin(math.radians(p[2] + curr_direction))
+		curr_x = curr_x + math.sqrt(q[0]**2 + q[1]**2) * math.cos(math.radians(q[2] + curr_direction))
+		curr_y = curr_y + math.sqrt(q[0]**2 + q[1]**2) * math.sin(math.radians(q[2] + curr_direction))
 		#publish msg
 		msg = Point()
 		msg.x = curr_x
@@ -64,7 +69,7 @@ end_angle = 135
 angle_span = end_angle - start_angle
 theta_delta = (end_angle - start_angle) * 1.0 /N
 thetas = np.arange(start_angle,end_angle,theta_delta)
-# ACCEPTABLE_DISTANCE = sys.float_info.max
+acceptable_distance = sys.float_info.max
 
 # Process laser scan and save as cartesian
 def process_scan(data):
@@ -89,19 +94,44 @@ threshold = 0.1
 def iterative_find_q(curr_scan, prev_scan):
 	# define an initial guess for q_0
 	q = np.array([0,0,0])
+	# initialize empty C & q
+	C = np.zeros([N,3])
+	prev_C = np.zeros([N,3])
+	prev_q = np.array([0,0,0])
 	# k is the cnt of iteration
 	k = 0
-	# initialize error to be something big
+	# initialize error & diff_C to be something big
 	error = N
+	diff_C = sys.float_info.max
+	# initialize set of previously seen C
+	seen_C = set()
 
-	# while error(q_(k+1), C_k) is larger than a threshold:
-	while (error > threshold):
+	# while:
+	# 1. test convergence: diff(C_(k-1),C_(k)) is larger than a threshold 
+	# 2. test cycle (previously seen C)
+	while (diff_C > threshold):
+		prev_C = C.copy()
+		prev_q = q.copy()
+		k += 1
 		# C_(k+1) = search_correspondence(curr_scan, prev_scan, q_(k+1))
-		C = search_correspondence(curr_scan, prev_scan, q)
-		# q_(k+2) = get_q(curr_scan, prev_scan, C_(k+2)) #TODO
+		C = search_correspondence(curr_scan, prev_scan, prev_q)
+		diff_C = np.sum((prev_C[:,1] - C[:,1])**2)
+		print("iteration %d; diff(prev_C[:,1] - C[:,1]): %0.2f" % (k, diff_C))
+
+		# q_(k+2) = get_q(curr_scan, prev_scan, C_(k+2))
 		q = get_q(curr_scan, prev_scan, C)
+
 		# calculate error(q_(k+2), C_(k+1))
 		error = calculate_error(curr_scan, prev_scan, C, q)
+		print("iteration %d; error: %0.2f" % (k, error))
+		# pdb.set_trace() # debug
+
+		# detect loop
+		C_str = np.array2string(C[:,1])
+		if C_str in seen_C:
+			break
+		else:
+			seen_C.add(C_str)
 
 	# return q
 	return q
@@ -141,7 +171,7 @@ def search_correspondence(curr_scan, prev_scan, q):
 
 	# create pairings
 	for i in range(N):
-	  	world_angle = i / (N - 1.0) * ANGLE_SPAN + START_ANGLE
+	  	world_angle = i / (N - 1.0) * angle_span + start_angle
 	  	world_norm = (world_x[i])**2 + (world_y[i])**2
 	  	best = -1
 	  	best_dist = sys.float_info.max
@@ -172,12 +202,12 @@ def search_correspondence(curr_scan, prev_scan, q):
 					continue
 		        
 				last_dist_up = (old_x[up] - world_x[i])**2 + (old_y[up] - world_y[i])**2
-				if (last_dist_up < best_dist and last_dist_up < ACCEPTABLE_DISTANCE):
+				if (last_dist_up < best_dist and last_dist_up < acceptable_distance):
 					best = up
 					best_dist = last_dist_up
 		        
 				if (isAngleBigger(world_x[i], world_y[i], old_x[up], old_y[up])):
-					angle_offset = (up - i) / (N - 1.0) * ANGLE_SPAN + START_ANGLE
+					angle_offset = (up - i) / (N - 1.0) * angle_span + start_angle
 					min_dist_up = np.sin(np.deg2rad(angle_offset)) * world_norm
 					if (min_dist_up > best_dist):
 						up_stopped = True
@@ -199,12 +229,12 @@ def search_correspondence(curr_scan, prev_scan, q):
 					continue
 				
 				last_dist_down = (old_x[down] - world_x[i])**2 + (old_y[down]- world_y[i])**2
-				if (last_dist_down < best_dist and last_dist_down < ACCEPTABLE_DISTANCE):
+				if (last_dist_down < best_dist and last_dist_down < acceptable_distance):
 					best = down
 					best_dist = last_dist_down
 		        
 				if (isAngleBigger(old_x[down], old_y[down],world_x[i], world_y[i])):
-					angle_offset = (i - down) / (N - 1.0) * ANGLE_SPAN + START_ANGLE
+					angle_offset = (i - down) / (N - 1.0) * angle_span + start_angle
 					min_dist_down = np.sin(np.deg2rad(angle_offset)) * world_norm
 					if (min_dist_down > best_dist):
 						down_stopped = True
@@ -241,8 +271,7 @@ def getDownArrays(x, y, N):
   inIndexStack = []
   for i in range(0, N, 1):
     
-    r_array = x[i]**2 + y[i]**2
-    r = r_array[0]
+    r = x[i]**2 + y[i]**2
     
     lastOutIndex = -1
     lastOutValue = sys.float_info.max
@@ -288,9 +317,7 @@ def getUpArrays(x, y, N):
   inIndexStack = []
   for i in range(N-1, -1, -1):
     
-    r_array = x[i]**2 + y[i]**2
-    pdb.set_trace() #BUG!!!
-    r = r_array[0]
+    r = x[i]**2 + y[i]**2
     
     lastOutIndex = -1
     lastOutValue = sys.float_info.max
@@ -397,7 +424,7 @@ def get_q(p1,p2,C):
 
 	theta = np.arctan(x[3,0]/x[2,0])
 
-	print "error: ",(g.T*((2*M + 2*lam*W).I)*W*((2*M + 2*lam*W).I).T*g)[0,0] - 1
+	# print "error: ",(g.T*((2*M + 2*lam*W).I)*W*((2*M + 2*lam*W).I).T*g)[0,0] - 1
 
 	return np.array([x[0,0],x[1,0],theta]).T
 
