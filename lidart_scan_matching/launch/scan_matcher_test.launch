@@ -8,7 +8,12 @@
       <arg name="racecar_version" value="racecar-v2" />
   </include>
 
-  <node pkg="lidart_scan_matching" name="scan_matcher" type="scan_matcher.py" output="screen"/>
+  <node pkg="lidart_scan_matching" name="scan_matcher_real_time" type="scan_matcher_real_time.py" output="screen"/>
+  <node pkg="lidart_scan_matching" name="scan_matcher_visualization" type="scan_matcher_visualization.py" output="screen"/>
+
+   <node pkg="lidart_wall_following" name="pid_error_node" type="pid_error.py" output="screen"/>
+  <node pkg="lidart_wall_following" name="control_node" type="control.py" output="screen"/>
+  <node pkg="lidart_wall_following" name="sim_connector_node" type="sim_connector.py" output="screen"/>
 
   <node pkg="rviz" name="rviz" type="rviz" output="screen"/>
   <!-- <node pkg="rqt_console" name="rqt_console" type="rqt_console" output="screen"/> -->

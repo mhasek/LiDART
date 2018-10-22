@@ -9,83 +9,133 @@ from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Odometry
 import pdb
 from geometry_msgs.msg import Point
+import matplotlib.pyplot as plt
 
 pub = rospy.Publisher('scan_match_location', Point, queue_size=10)
+pub_odom = rospy.Publisher('scan_match_corr_odom_pos', Point, queue_size=10)
 
 # macros
-N = 1081
+N = 720
 
-# most current odom & scan
-most_curr_odom_pos = np.zeros([2,1])
-
-# Callback for receiving LIDAR data on the /scan topic.
-# the callback will get the most current odom position, get the estimated 
-# data: the LIDAR data, published as a list of distances to the wall.
+# Get the real time estimated location, based on the most recent pair of odom_pos and scan
 is_first_time = True
 prev_scan = np.array(N)
 curr_scan = np.array(N)
 curr_x = 0 #???is the initial location 0,0?? TODO 
 curr_y = 0 #???is the initial location 0,0?? TODO 
 curr_direction =  0 # initialized to be 0 (pointing in +x) degrees. positive is counter-clockwise
-
-def scan_callback(data):
-
+def real_time_estimated_location():
 	global is_first_time
 	global prev_scan
 	global curr_scan
 	global curr_direction
 	global curr_x
 	global curr_y
+	global error_list
+	global error_2_list
 
-	curr_scan = process_scan(data)
+	# lock that will be unlocked after we receive the first scan
+	while first_scan:
+		print("")
 
-	if not is_first_time:
+	while True:
+		curr_scan = process_scan(most_curr_scan)
+		curr_odom_pos = most_curr_odom_pos
 
-		# given 2 lidar scans, get the q that minimizes the error function
-		q = iterative_find_q(curr_scan, prev_scan)
+		if not is_first_time:
 
-		print("found q: %0.2f %0.2f %0.2f" % (q[0], q[1], q[2]))
+			# given 2 lidar scans, get the q that minimizes the error function
+			error_list = []
+			error_2_list = []
 
-		# use the q to calculate current location
-		curr_x = curr_x + math.sqrt(q[0]**2 + q[1]**2) * math.cos(math.radians(q[2] + curr_direction))
-		curr_y = curr_y + math.sqrt(q[0]**2 + q[1]**2) * math.sin(math.radians(q[2] + curr_direction))
-		#publish msg
-		msg = Point()
-		msg.x = curr_x
-		msg.y = curr_y
-		msg.z = 0
-		pub.publish(msg)
-		# update values
-		curr_direction = curr_direction + q[2]
-		prev_scan = curr_scan
+			q = iterative_find_q(curr_scan, prev_scan)
 
-	else: # first time
-		is_first_time = False
-		prev_scan = curr_scan
+			curr_transform = np.matmul(rot(q[2]),curr_scan.T).T + np.tile(q[:2], (N,1))
 
-		msg = Point()
-		msg.x = 0
-		msg.y = 0
-		msg.z = 0
-		pub.publish(msg)
+			# plt.plot(prev_scan[:,0],prev_scan[:,1])
+			# plt.plot(curr_scan[:,0],curr_scan[:,1])
+			# plt.plot(curr_transform[:,0],curr_transform[:,1])
+			# plt.legend(["prev_scan","curr_scan","curr_transform"])
+			# plt.show()
+
+			# plt.plot(error_list) # debug
+			# plt.plot(error_2_list)
+			# plt.legend(["error","error_2"])
+			# plt.show()
+
+			# pdb.set_trace()
+
+			#print("found q: %0.2f %0.2f %0.2f" % (q[0], q[1], q[2]))
+
+			# use the q to calculate current location
+			# curr_x = curr_x + math.sqrt(q[0]**2 + q[1]**2) * math.cos(curr_direction - q[2])
+			# curr_y = curr_y + math.sqrt(q[0]**2 + q[1]**2) * math.sin(curr_direction - q[2])
+			curr_x = curr_x + math.sqrt(q[0]**2 + q[1]**2) * math.cos(curr_direction + q[2])
+			curr_y = curr_y + math.sqrt(q[0]**2 + q[1]**2) * math.sin(curr_direction + q[2])
+			#publish msg
+			msg = Point()
+			msg.x = curr_x
+			msg.y = curr_y
+			msg.z = 0
+			pub.publish(msg)
+
+			# update values
+			# curr_direction = curr_direction - q[2]
+			curr_direction = curr_direction + q[2]
+			prev_scan = curr_scan
+
+			#publish corresponding odom pos
+			pub_odom.publish(curr_odom_pos)
+
+		else: # first time
+			is_first_time = False
+			prev_scan = curr_scan
+
+			msg = Point()
+			msg.x = 0
+			msg.y = 0
+			msg.z = 0
+			pub.publish(msg)
+
+			#publish corresponding odom pos
+			pub_odom.publish(curr_odom_pos)
+
+# --------------------- HELPER FUNCTIONS RELATED TO SUBSCRIBER CALLBACK ------------------------ #
+
+# most current odom & scan
+most_curr_odom_pos = Point()
+most_curr_scan = np.array(N)
+first_scan = True
+
+def scan_callback(data):
+	global first_scan
+	global most_curr_scan
+
+	if first_scan:
+		first_scan = False
+	
+	most_curr_scan = data
+
+def odom_callback(data):
+	global most_curr_odom_pos
+	# pdb.set_trace() # debug
+	most_curr_odom_pos = data.pose.pose.position
 
 # --------------------- HELPER FUNCTIONS RELATED TO LIDAR SCAN PROCESSING ------------------------ #
-# values used for laser scan processing
-start_angle = -135
-end_angle = 135
-angle_span = end_angle - start_angle
-theta_delta = (end_angle - start_angle) * 1.0 /N
-thetas = np.arange(start_angle,end_angle,theta_delta)
-acceptable_distance = sys.float_info.max
-
 # Process laser scan and save as cartesian
 def process_scan(data):
 	# read input
-	scans = np.array(data.ranges);
-	# cap at min and max
+	scans = np.array(data.ranges)
+	# cap at min and max (radian)
+	theta_min = data.angle_min
+	theta_max = data.angle_max
+	theta_delta = data.angle_increment
+	# pdb.set_trace()
+
 	r_min = data.range_min
 	r_max = data.range_max
 	scans = np.clip(scans, r_min, r_max)
+	thetas = np.arange(theta_min,theta_max,theta_delta)
 	# converted to cartesian
 	scan_x = scans*np.cos(thetas)
 	scan_y = scans*np.sin(thetas)
@@ -99,8 +149,13 @@ def process_scan(data):
 # output: q = [t_x, t_y, theta]
 threshold = 0.1
 prev_q = np.array([0,0,0])
+# debug!
+error_list = []
+error_2_list = []
 def iterative_find_q(curr_scan, prev_scan):
 	global prev_q
+	global error_list
+	global error_2_list
 	# define an initial guess for q_0
 	q = prev_q.copy()
 	# initialize empty C & q
@@ -111,35 +166,54 @@ def iterative_find_q(curr_scan, prev_scan):
 	# initialize error & diff_C to be something big
 	error = N
 	diff_C = sys.float_info.max
-	# initialize set of previously seen C
-	seen_C = set()
+	diff_q = sys.float_info.max
+	diff_error = sys.float_info.max
+	prev_error = 0;
+	# initialize set of previously seen q
+	seen_q = set()
 
 	# while:
 	# 1. test convergence: diff(C_(k-1),C_(k)) is larger than a threshold 
 	# 2. test cycle (previously seen C)
-	while (diff_C > threshold):
+	while (abs(diff_error) > threshold):
 		prev_C = C.copy()
 		prev_q = q.copy()
 		k += 1
+		# print("iteration %d" % k)
 		# C_(k+1) = search_correspondence(curr_scan, prev_scan, q_(k+1))
 		C = search_correspondence(curr_scan, prev_scan, prev_q)
-		diff_C = np.sum((prev_C[:,1] - C[:,1])**2)
-		print("iteration %d; diff(prev_C[:,1] - C[:,1]): %0.2f" % (k, diff_C))
+		print(len(C), len(C[0]))
+		
+		error_2 = calculate_error(curr_scan, prev_scan, C, prev_q)
+		error_2_list.append(error_2)
+		# print("iteration %d; error_2: %0.2f" % (k, error_2))
+
+		# diff_C = np.sum((prev_C[:,1] - C[:,1])**2)
+		# print("iteration %d; diff(prev_C[:,1] - C[:,1]): %0.2f" % (k, diff_C))
 
 		# q_(k+2) = get_q(curr_scan, prev_scan, C_(k+2))
 		q = get_q(curr_scan, prev_scan, C)
+		#diff_q = np.sum((prev_q - q)**2)
+		#print("iteration %d; diff_q: %0.2f" % (k, diff_q))
 
 		# calculate error(q_(k+2), C_(k+1))
+		prev_error = error
 		error = calculate_error(curr_scan, prev_scan, C, q)
-		print("iteration %d; error: %0.2f" % (k, error))
+		diff_error = error - prev_error
+		print("iteration %d; error: %0.2f; error diff: %0.2f" % (k, error, diff_error))
+		error_list.append(error) # debug
+
 		# pdb.set_trace() # debug
 
 		# detect loop
-		C_str = np.array2string(C[:,1])
-		if C_str in seen_C:
+		q_str = np.array2string(q, precision=2)
+
+		#print("iteration %d; q_str:%s" % (k, q_str))
+		if q_str in seen_q:
+			print("cycle detected")
 			break
 		else:
-			seen_C.add(C_str)
+			seen_q.add(q_str)
 
 	# return q
 	return q
@@ -147,9 +221,8 @@ def iterative_find_q(curr_scan, prev_scan):
 def calculate_error(curr_scan, prev_scan, C, q):
 	project_p2p = np.matmul(rot(q[2]),curr_scan.T).T + np.tile(q[:2], (N,1)) - prev_scan[C[:,1],:]
 	segments = prev_scan[C[:,1],:] - prev_scan[C[:,2],:]
-	normals = np.array([-segments[:,1], -segments[:,0]]).T
+	normals = np.array([-segments[:,1], segments[:,0]]).T
 	normals_lengths = np.sqrt(np.sum(normals**2, axis = 1))
-	normals_lengths
 	normals = normals / normals_lengths.reshape(N,1)
 	project_p2l = np.sum(np.sum(np.multiply(normals,project_p2p), axis=1)**2)
 	return project_p2l
@@ -157,13 +230,19 @@ def calculate_error(curr_scan, prev_scan, C, q):
 # --------------------- HELPER FUNCTIONS RELATED TO SEARCH CORRESPONDENCE ------------------------ #
 # Search the closest correspondence between curr_scan and prev_scan
 # input: curr_scan, prev_scan: both lidar scans; 
-# q: roto-transformation guess from curr_scan to prev_scan [t_x, t_y, theta]
+# q: roto-transformation guess from curr_scan to prev_scan [t_x, t_y, theta], where theta is in radian
 # output: C[N,3]: [i,ji1,ji2] - i-th scan in current scan corresponds to ji1 and ji2 in previous scan
 def search_correspondence(curr_scan, prev_scan, q):
+	# values used for search correspondence (in angles)
+	start_angle = -135
+	end_angle = 135
+	angle_span = end_angle - start_angle
+	acceptable_distance = sys.float_info.max
+
 	# old scan: prev_scan
 	old_x = prev_scan[:,0]
 	old_y = prev_scan[:,1]
-	# world scan: curr_scan projected onto prev_scan after transform q
+	# world scan: curr_scan transformed onto prev_scan after transform q
 	world_xy = np.matmul(rot(q[2]), curr_scan.T) + np.tile((q[:2].reshape(-1,1)),(1,N))
 	world_x = world_xy[0,:]
 	world_y = world_xy[1,:]
@@ -256,17 +335,27 @@ def search_correspondence(curr_scan, prev_scan, q):
 					down -= 1
 			
 				if (down < 0 or down >= N): down_stopped = True
-		          
-		C[i,1] = best
-		C[i,2] = (C[i,1] - 1) if (C[i,1]+1 >= N)  else (C[i,1] + 1)
+
+		#best + 1 is closer
+		if (best == 0 or (best != (N-1) and ((old_x[best + 1] - world_x[i])**2 + (old_y[best + 1] - world_y[i]) > (old_x[best - 1] - world_x[i])**2 + (old_y[best - 1] - world_y[i])))): 
+			C[i,1] = best
+			C[i,2] = best + 1
+		else:
+			C[i,1] = best - 1
+			C[i,2] = best
+                      
 		last_best = best
 
 	return C
 
+# use radian
+def rot(rad):
+	return np.array([[np.cos(rad), -np.sin(rad)], [np.sin(rad), np.cos(rad)]])
 
-
-def rot(theta):
-	return np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]])
+# use theta
+def rot_deg(theta):
+	rad = np.deg2rad(theta)
+	return np.array([[np.cos(rad), -np.sin(rad)], [np.sin(rad), np.cos(rad)]])
 
 def getDownArrays(x, y, N):
  
@@ -365,26 +454,35 @@ def dist(new_point):
   return np.sqrt(new_point[0]**2 + new_point[1]**2) 
 
 def isAngleBigger(x1, y1, x2, y2):
+  # x1 = y1_in
+  # x2 = y2_in
+  # y1 = -x1_in
+  # y2 = -x2_in
   # Returns whether angle 1 is to the right of (further up for indices) angle 2
-  if (x1 == 0): return (x1 > x2)
-  if (x1 > 0 and x2 < 0): return True
-  if (x1 < 0 and x2 > 0): return False
-  if (x1 > 0 and x2 > 0):
-    if (y1 >= 0 and y2 <= 0): return False
-    if (y1 <= 0 and y2 >= 0): return True
-    else:
-      return (y2/x2 > y1/x1)
+  # if (x1 == 0): return (x1 > x2)
+  # if (x1 > 0 and x2 < 0): return True
+  # if (x1 < 0 and x2 > 0): return False
+  # if (x1 > 0 and x2 > 0):
+  #   if (y1 >= 0 and y2 <= 0): return False
+  #   if (y1 <= 0 and y2 >= 0): return True
+  #   else:
+  #     return (y2/x2 > y1/x1)
+  # else:
+  #   # Xs negative
+  #   if (y1 <= 0 and y2 >= 0): return False
+  #   if (y1 >= 0 and y2 <= 0): return True
+  #   else:
+  #     return (y1/x1 > y2/x2)
+
+  if (y1 * y2 < 0):
+  	return (y1 > y2)
   else:
-    # Xs negative
-    if (y1 <= 0 and y2 >= 0): return False
-    if (y1 >= 0 and y2 <= 0): return True
-    else:
-      return (y1/x1 > y2/x2)
+  	calc = (x1 - x2) * y2 - x2 * (y1 - y2)
+  	return (calc < 0)
 
 
 # --------------------- HELPER FUNCTIONS RELATED TO GET Q ------------------------ #
 def get_q(p1,p2,C):
-
 
 	M = np.zeros((4,4))
 	g = np.zeros((4,1))
@@ -430,7 +528,7 @@ def get_q(p1,p2,C):
 
 	x = fx(lam)
 
-	theta = np.arctan(x[3,0]/x[2,0])
+	theta = np.arctan(x[3,0]/x[2,0]) # theta is in radian
 
 	# print "error: ",(g.T*((2*M + 2*lam*W).I)*W*((2*M + 2*lam*W).I).T*g)[0,0] - 1
 
@@ -457,6 +555,8 @@ def getRHS(A,B,Sa,g):
 
 # Boilerplate code to start this ROS node.
 if __name__ == '__main__':
-  rospy.init_node('scan_matcher', anonymous = True)
+  rospy.init_node('scan_matcher_real_time', anonymous = True)
   rospy.Subscriber("scan", LaserScan, scan_callback)
+  rospy.Subscriber("vesc/odom", Odometry, odom_callback)
+  real_time_estimated_location()
   rospy.spin()
