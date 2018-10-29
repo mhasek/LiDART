@@ -1,15 +1,15 @@
 <?xml version="1.0"?>
 <launch>
   <include file="$(find racecar_gazebo)/launch/racecar.launch">
-	   <arg name="world_name" value="track_porto"/>
-     <!-- <arg name="gui" value="false"/> -->
+	   <arg name="world_name" value="track_barca"/>
+     <arg name="gui" value="false"/>
   </include>
   <include file="$(find racecar)/launch/includes/common/joy_teleop.launch.xml" >
       <arg name="racecar_version" value="racecar-v2" />
   </include>
 
   <node pkg="lidart_scan_matching" name="scan_matcher_real_time" type="scan_matcher_real_time.py" output="screen"/>
-  <node pkg="lidart_scan_matching" name="scan_matcher_visualization" type="scan_matcher_visualization.py" output="screen"/>
+  <node pkg="lidart_scan_matching" name="scan_matcher_visualization_2" type="scan_matcher_visualization_2" output="screen"/>
 
   <node pkg="lidart_wall_following" name="pid_error_node" type="pid_error.py" output="screen"/>
   <node pkg="lidart_wall_following" name="control_node" type="control.py" output="screen"/>
