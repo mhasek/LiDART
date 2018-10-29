@@ -24,9 +24,21 @@ N = 0
 is_first_time = True
 prev_scan = np.array(N)
 curr_scan = np.array(N)
-curr_x = 0 #???is the initial location 0,0?? TODO
-curr_y = 0 #???is the initial location 0,0?? TODO
+curr_x = 0
+curr_y = 0
+prev_x = 0
+prev_y = 0
 curr_direction =  0 # initialized to be 0 (pointing in +x) degrees. positive is counter-clockwise
+curr_pos = np.array([0,0,0])
+
+# Mean Squared Error variables
+mse_location = 0
+max_error_location = sys.float_info.min
+tot_error_rot = 0
+avg_error_rot = 0
+tot_error_translation = 0
+avg_error_translation = 0
+
 def real_time_estimated_location():
 	global is_first_time
 	global prev_scan
@@ -34,14 +46,29 @@ def real_time_estimated_location():
 	global curr_direction
 	global curr_x
 	global curr_y
+	global prev_x
+	global prev_y
+	global prev_
 	global error_list
 	global error_2_list
+	global curr_pos
 
+	global mse_location
+	global max_error_location
+	global tot_error_rot
+	global avg_error_rot
+	global tot_error_translation
+	global avg_error_translation
+
+	estimated_xys = np.array([curr_x, curr_y]).reshape(1,-1)
+	actual_xys = np.array([most_curr_odom_pos.x, most_curr_odom_pos.y]).reshape(1,-1)
+	cnt = 0 # solely used for counting how many estimates we have already made and debug
+	fake_cnt = 0
 
 	# lock that will be unlocked after we receive the first scan
 	while first_scan and not rospy.is_shutdown():
-		print("no first scan")
-	q = np.array([0, 0, 0])
+		fake_cnt += 1
+
 	while not rospy.is_shutdown():
 		curr_scan = process_scan(most_curr_scan)
 		curr_odom_pos = most_curr_odom_pos
@@ -55,12 +82,12 @@ def real_time_estimated_location():
 			curr_odom_local = deepcopy(curr_odom)
 			curr_odom_local_time = deepcopy(curr_odom_time)
 
-			delta_odom = pos_minus(curr_odom_local, prev_odom_local)
+			delta_odom = curr_odom_local - prev_odom_local
 			# delta_odom = pos_minus(prev_odom_local, curr_odom_local)
 			# delta_odom = curr_odom_local + -1*prev_odom_local
 			# delta_odom = curr_odom_local - q
 			# delta_odom = pos_minus(curr_odom_local, q)
-			delta_odom = [0, 0, 0]
+			# delta_odom = np.array([0, 0, 0])
 
 			q, mask = iterative_find_q(curr_scan, prev_scan, delta_odom)
 			time2 = int(round(time.time() * 1000))
@@ -96,8 +123,28 @@ def real_time_estimated_location():
 			# use the q to calculate current location
 			#curr_x = curr_x + math.sqrt(q[0]**2 + q[1]**2) * math.cos(curr_direction - q[2])
 			#curr_y = curr_y + math.sqrt(q[0]**2 + q[1]**2) * math.sin(curr_direction - q[2])
+			prev_x = curr_x
+			prev_y = curr_y
 			curr_x = curr_x + math.sqrt(q[0]**2 + q[1]**2) * math.cos(curr_direction + q[2])
 			curr_y = curr_y + math.sqrt(q[0]**2 + q[1]**2) * math.sin(curr_direction + q[2])
+
+			# print out errors
+			estimated_xys = np.append(estimated_xys, [[curr_x, curr_y]], axis=0)
+			actual_xys = np.append(actual_xys, [[curr_odom_pos.x, curr_odom_pos.y]], axis=0)
+
+			error_location = ((curr_odom_pos.x - curr_x)**2 + (curr_odom_pos.y - curr_y)**2)
+			max_error_location = max(max_error_location, error_location)
+			mse_location = np.sum(np.sum((estimated_xys - actual_xys)**2, axis=1), axis=0) / (1.0 * cnt)
+			tot_error_translation += np.sqrt(np.sum((delta_odom[:2] - q[:2])**2))
+			avg_error_translation = tot_error_translation / (1.0 * cnt)
+			tot_error_rot += (q[2] - delta_odom[2])
+			avg_error_rot = tot_error_rot / (1.0 * cnt)
+
+			print("mse_location: %0.2f" % mse_location)
+			print("max_error_location: %0.2f" % max_error_location)
+			print("avg_error_translation: %0.2f" % avg_error_translation)
+			print("avg_error_rot: %0.2f" % avg_error_rot)
+
 			#publish msg
 			msg = Point()
 			msg.x = curr_x
@@ -118,6 +165,7 @@ def real_time_estimated_location():
 
 
 		else: # first time
+			cnt += 1
 			is_first_time = False
 			prev_scan = curr_scan
 
@@ -198,6 +246,16 @@ def pos_minus(q1,q2):
 
 	return q3
 
+def pos_plus(q1,q2):
+	# roto translate q1 by q2
+	RT1 = get_RT_mat(q1)
+	RT2 = get_RT_mat(q2)
+	RT = RT2*RT1
+
+	q_out = np.array([RT[0,2],RT[1,2],np.arccos(RT[0,0])])
+
+	return q_out
+
 # Process laser scan and save as cartesian
 def process_scan(data):
 	# read input
@@ -227,7 +285,7 @@ def process_scan(data):
 # Iteratively find the q that minimizes the error function
 # input: curr_scan, prev_scan
 # output: q = [t_x, t_y, theta]
-epsilon_xy = 0.1
+epsilon_xy = 0.05
 epsilon_theta = 0.05
 max_iteration = 30
 prev_q = np.array([0,0,0])
@@ -289,6 +347,7 @@ def iterative_find_q(curr_scan, prev_scan, q0):
 		# pdb.set_trace()
 		# q_(k+2) = get_q(curr_scan, prev_scan, C_(k+2))
 		time3 = int(round(time.time() * 1000))
+		
 		if error_2/len(error_vec) == 0 or k < 3:
 			q = get_q(curr_scan, prev_scan, C)
 		else:
