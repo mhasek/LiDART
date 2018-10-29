@@ -9,7 +9,7 @@
 
   <!-- <include file="$(find racecar)/launch/teleop.launch"/> -->
 
-  <node pkg="lidart_scan_matching" name="scan_matcher_real_time" type="scan_matcher_real_time.py" output="screen"/>
+  <node pkg="lidart_scan_matching" name="scan_matcher" type="scan_matcher.py" output="screen"/>
   <node pkg="lidart_scan_matching" name="scan_matcher_visualization_2" type="scan_matcher_visualization_2" output="screen"/>
 
   <node pkg="lidart_wall_following" name="pid_error_node" type="pid_error.py" output="screen"/>
