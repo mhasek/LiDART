@@ -3,7 +3,6 @@
 import rospy
 import math
 import numpy as np
-import genpy
 import yaml
 import sys
 from sensor_msgs.msg import LaserScan
@@ -12,8 +11,6 @@ import pdb
 from geometry_msgs.msg import Point
 import matplotlib.pyplot as plt
 import time
-from copy import deepcopy
-from scipy.spatial.distance import cdist
 
 pub = rospy.Publisher('scan_match_location', Point, queue_size=10)
 pub_odom = rospy.Publisher('scan_match_corr_odom_pos', Point, queue_size=10)
@@ -25,13 +22,9 @@ N = 0
 is_first_time = True
 prev_scan = np.array(N)
 curr_scan = np.array(N)
-curr_x = 0 # this is correct. confirmed
-curr_y = 0 # this is correct. confirmed
-prev_x = 0
-prev_y = 0
+curr_x = 0 #???is the initial location 0,0?? TODO 
+curr_y = 0 #???is the initial location 0,0?? TODO 
 curr_direction =  0 # initialized to be 0 (pointing in +x) degrees. positive is counter-clockwise
-curr_pos = np.array([0,0,0])
-
 def real_time_estimated_location():
 	global is_first_time
 	global prev_scan
@@ -39,46 +32,32 @@ def real_time_estimated_location():
 	global curr_direction
 	global curr_x
 	global curr_y
-	global prev_x
-	global prev_y
-	global prev_
 	global error_list
 	global error_2_list
-	global curr_pos
-
-	estimated_xys = np.array([curr_x, curr_y]).reshape(1,-1)
-	actual_xys = np.array([most_curr_odom_pos.x, most_curr_odom_pos.y]).reshape(1,-1)
-	cnt = 0 # solely used for counting how many estimates we have already made and debug
-	fake_cnt = 0
 
 	# lock that will be unlocked after we receive the first scan
-	while first_scan and not rospy.is_shutdown():
-		fake_cnt += 1
+	while first_scan:
+		print("no first scan")
 
 	while not rospy.is_shutdown():
 		curr_scan = process_scan(most_curr_scan)
 		curr_odom_pos = most_curr_odom_pos
 
 		if not is_first_time:
-			cnt += 1
 
 			# given 2 lidar scans, get the q that minimizes the error function
 			error_list = []
 			error_2_list = []
 
-			curr_odom_local = deepcopy(curr_odom)
-			curr_odom_local_time = deepcopy(curr_odom_time)
 			
-			delta_odom = pos_minus(curr_odom_local, prev_odom_local)
-			
-			q = iterative_find_q(curr_scan, prev_scan, delta_odom)
+			q = iterative_find_q(curr_scan, prev_scan)
 			time2 = int(round(time.time() * 1000))
 
-			curr_transform = np.matmul(rot(q[2]),curr_scan.T).T + q[:2]
+			curr_transform = np.matmul(rot(q[2]),curr_scan.T).T + np.tile(q[:2], (N,1))
 
-			# plt.plot(prev_scan[:,0],prev_scan[:,1],'g')
-			# plt.plot(curr_scan[:,0],curr_scan[:,1],'bo')
-			# plt.plot(curr_transform[:,0],curr_transform[:,1],'ro')
+			# plt.plot(prev_scan[:,0],prev_scan[:,1])
+			# plt.plot(curr_scan[:,0],curr_scan[:,1])
+			# plt.plot(curr_transform[:,0],curr_transform[:,1])
 			# plt.legend(["prev_scan","curr_scan","curr_transform"])
 			# plt.show()
 
@@ -92,40 +71,10 @@ def real_time_estimated_location():
 			#print("found q: %0.2f %0.2f %0.2f" % (q[0], q[1], q[2]))
 
 			# use the q to calculate current location
-			#curr_x = curr_x + math.sqrt(q[0]**2 + q[1]**2) * math.cos(curr_direction - q[2])
-			#curr_y = curr_y + math.sqrt(q[0]**2 + q[1]**2) * math.sin(curr_direction - q[2])
-			prev_x = curr_x
-			prev_y = curr_y
-			curr_x = curr_x + math.sqrt(q[0]**2 + q[1]**2) * math.cos(curr_direction + q[2])
-			curr_y = curr_y + math.sqrt(q[0]**2 + q[1]**2) * math.sin(curr_direction + q[2])
-
-			# curr_pos = pos_plus(curr_pos,q)
-			# curr_x = curr_pos[0]
-			# curr_y = curr_pos[1]
-
-			estimated_xys = np.append(estimated_xys, [[curr_x, curr_y]], axis=0)
-			actual_xys = np.append(actual_xys, [[curr_odom_pos.x, curr_odom_pos.y]], axis=0)
-
-			# print(cnt)
-
-			# if cnt >= 1000: # above a certain limit
-			# 	# print(estimated_xys)
-			# 	# print(actual_xys)
-			# 	# print(q) # estimated q
-			# 	# print(delta_odom) # actual q?
-
-			# 	plt.subplot(2,1,1)
-			# 	plt.plot(estimated_xys[:,0],estimated_xys[:,1],'b-o') # debug
-			# 	plt.plot(actual_xys[:,0],actual_xys[:,1],'g-o')
-			# 	plt.legend(["estimated","actual"])
-
-			# 	plt.subplot(2,1,2)
-			# 	plt.plot(prev_scan[:,0],prev_scan[:,1],'g')
-			# 	plt.plot(curr_scan[:,0],curr_scan[:,1],'bo')
-			# 	plt.plot(curr_transform[:,0],curr_transform[:,1],'ro')
-			# 	plt.legend(["prev_scan","curr_scan","curr_transform"])
-			# 	plt.show()
-
+			curr_x = curr_x + math.sqrt(q[0]**2 + q[1]**2) * math.cos(curr_direction - q[2])
+			curr_y = curr_y + math.sqrt(q[0]**2 + q[1]**2) * math.sin(curr_direction - q[2])
+			# curr_x = curr_x + math.sqrt(q[0]**2 + q[1]**2) * math.cos(curr_direction + q[2])
+			# curr_y = curr_y + math.sqrt(q[0]**2 + q[1]**2) * math.sin(curr_direction + q[2])
 			#publish msg
 			msg = Point()
 			msg.x = curr_x
@@ -134,25 +83,16 @@ def real_time_estimated_location():
 			pub.publish(msg)
 
 			# update values
-			#curr_direction = curr_direction - q[2]
-			curr_direction = curr_direction + q[2]
+			curr_direction = curr_direction - q[2]
+			# curr_direction = curr_direction + q[2]
 			prev_scan = curr_scan
-
-			prev_odom_local = curr_odom_local
-			prev_odom_local_time = curr_odom_local_time
 
 			#publish corresponding odom pos
 			pub_odom.publish(curr_odom_pos)
-			
 
 		else: # first time
-			cnt += 1
 			is_first_time = False
 			prev_scan = curr_scan
-
-			prev_odom_local = deepcopy(curr_odom)
-			prev_odom_local_time = deepcopy(curr_odom_time)
-			# curr_pos = deepcopy(curr_odom)
 
 			msg = Point()
 			msg.x = 0
@@ -163,16 +103,12 @@ def real_time_estimated_location():
 			#publish corresponding odom pos
 			pub_odom.publish(curr_odom_pos)
 
-
 # --------------------- HELPER FUNCTIONS RELATED TO SUBSCRIBER CALLBACK ------------------------ #
 
 # most current odom & scan
 most_curr_odom_pos = Point()
 most_curr_scan = np.array(N)
 first_scan = True
-first_odom = False
-curr_odom = np.array([0,0,0])
-curr_odom_time = genpy.Time()
 
 def scan_callback(data):
 	global first_scan
@@ -186,96 +122,44 @@ def scan_callback(data):
 	most_curr_scan = data
 
 def odom_callback(data):
-	global curr_odom
-	global first_odom
-	global curr_odom_time
 	global most_curr_odom_pos
-
+	# pdb.set_trace() # debug
 	most_curr_odom_pos = data.pose.pose.position
 
-	# pdb.set_trace() # debug
-	x = data.pose.pose.position.x
-	y = data.pose.pose.position.y
-	theta =  2 * np.arccos(data.pose.pose.orientation.w)
-
-	curr_odom = np.array([x,y,theta])
-	curr_odom_time = data.header.stamp
-	first_odom = True
-
 # --------------------- HELPER FUNCTIONS RELATED TO LIDAR SCAN PROCESSING ------------------------ #
-# a get_correspondence_naive function that supports discarding inf points in scan
-# pre-processing of scan input (in process_scan): if a scan range is larger than range_max, 
-# don't include that in the output curr_scan
-
-def get_RT_mat(q1):
-	t1 = np.matrix(q1[0:2].reshape(2,1))
-	R1 = np.matrix(rot(q1[2]))
-
-	RT1 = np.matrix(np.eye(3))
-	RT1[0:2,0:2] = R1
-	RT1[0:2,2] = t1
-
-	return RT1
-
-def pos_minus(q1,q2):
-	# roto translate q1 by -q2
-	RT1 = get_RT_mat(q1)
-	RT2 = get_RT_mat(q2)
-
-	RT = RT2.I*RT1
-
-	q3 = np.array([RT[0,2],RT[1,2],np.arccos(RT[0,0])])
-
-	return q3 
-
-def pos_plus(q1,q2):
-	# roto translate q1 by q2
-	RT1 = get_RT_mat(q1)
-	RT2 = get_RT_mat(q2)
-	RT = RT2*RT1
-
-	q_out = np.array([RT[0,2],RT[1,2],np.arccos(RT[0,0])])
-
-	return q_out
-
 # Process laser scan and save as cartesian
 def process_scan(data):
 	# read input
 	scans = np.array(data.ranges)
+	# cap at min and max (radian)
 	theta_min = data.angle_min
 	theta_max = data.angle_max
 	theta_delta = data.angle_increment
-
 	# pdb.set_trace()
+
 	r_min = data.range_min
 	r_max = data.range_max
+	scans = np.clip(scans, r_min, r_max)
 	thetas = np.arange(theta_min,theta_max,theta_delta)
-	theta_scans = np.hstack((thetas.reshape(-1,1), scans.reshape(-1,1)))
-	print("theta_scans length: %d" % len(theta_scans))
-
-	theta_scans = theta_scans[theta_scans[:,1] <= r_max]
-	theta_scans = theta_scans[theta_scans[:,1] >= r_min]
-	print("after discarding out-of-range vals: %d" % len(theta_scans))
-
 	# converted to cartesian
-	scan_x = theta_scans[:,1]*np.cos(theta_scans[:,0])
-	scan_y = theta_scans[:,1]*np.sin(theta_scans[:,0])
+	scan_x = scans*np.cos(thetas)
+	scan_y = scans*np.sin(thetas)
 	data_xy = np.hstack((scan_x.reshape(-1,1),scan_y.reshape(-1,1)))
+
 	return data_xy
 
 # --------------------- HELPER FUNCTIONS RELATED TO ITERATIVELY FINDING Q ------------------------ #
 # Iteratively find the q that minimizes the error function
 # input: curr_scan, prev_scan
 # output: q = [t_x, t_y, theta]
-epsilon_xy = 0.05
-epsilon_theta = 0.05
+epsilon_xy = 0.2
+epsilon_theta = 0.1
 max_iteration = 30
 prev_q = np.array([0,0,0])
-
 # debug!
 error_list = []
 error_2_list = []
-def iterative_find_q(curr_scan, prev_scan, q0):
+def iterative_find_q(curr_scan, prev_scan):
 	global prev_q
 	global error_list
 	global error_2_list
@@ -311,7 +195,7 @@ def iterative_find_q(curr_scan, prev_scan, q0):
 		# C_(k+1) = search_correspondence(curr_scan, prev_scan, q_(k+1))
 		# C = search_correspondence(curr_scan, prev_scan, prev_q)
 		time1 = int(round(time.time() * 1000))
-		C = search_correspondence_brute(curr_scan, prev_scan, prev_q)
+		C = search_correspondence_naive(curr_scan, prev_scan, prev_q)
 		time2 = int(round(time.time() * 1000))
 
 		# debug
@@ -342,7 +226,7 @@ def iterative_find_q(curr_scan, prev_scan, q0):
 		
 		# debug
 		print("iteration %d; best_error: %0.2f; error: %0.2f; error diff: %0.2f" % (k, best_error, error, diff_error))
-		print("iteration %d: search_correspondence_brute time: %d; get_q time: %d"%(k, time2-time1, time4-time3))
+		print("iteration %d: search_correspondence_naive time: %d; get_q time: %d"%(k, time2-time1, time4-time3))
 		error_list.append(error) 
 
 		# pdb.set_trace() # debug
@@ -365,57 +249,32 @@ def iterative_find_q(curr_scan, prev_scan, q0):
 	return best_q
 
 def calculate_error(curr_scan, prev_scan, C, q):
-	project_p2p = np.matmul(rot(q[2]),curr_scan.T).T + q[:2] - prev_scan[C[:,1],:]
+	project_p2p = np.matmul(rot(q[2]),curr_scan.T).T + np.tile(q[:2], (N,1)) - prev_scan[C[:,1],:]
 	segments = prev_scan[C[:,1],:] - prev_scan[C[:,2],:]
 	normals = np.array([-segments[:,1], segments[:,0]]).T
 	normals_lengths = np.sqrt(np.sum(normals**2, axis = 1))
-	normals = normals / normals_lengths.reshape(-1,1)
+	normals = normals / normals_lengths.reshape(N,1)
 	project_p2l = np.sum(np.sum(np.multiply(normals,project_p2p), axis=1)**2)
 	return project_p2l
 
 # --------------------- HELPER FUNCTIONS RELATED TO SEARCH CORRESPONDENCE ------------------------ #
 def search_correspondence_naive(curr_scan, prev_scan, q):
 	# transformed scan: curr_scan transformed onto prev_scan after transform q
-  transformed_xy = np.matmul(rot(q[2]),curr_scan.T).T + q[:2]
-  C = np.zeros([0, 3]).astype(int)
-  N_curr = len(curr_scan)
-  N_prev = len(prev_scan)
-  
-  for i in range(N_curr):
-    ji1 = closest_node(transformed_xy[i,:],prev_scan)
-    ji2 = -1
-    if (ji1 == 0):
-        ji2 = 1
-    elif (ji1 == (N_prev-1)):
-        ji2 = N_prev-2
-    else:
-      ji2 = (ji1 - 1) if (np.sum((prev_scan[(ji1-1),:] - transformed_xy[i,:])**2) 
-        < np.sum((prev_scan[ji1+1,:] - transformed_xy[i,:])**2)) else (ji1 + 1)
-    
-    C = np.append(C, [[i,ji1,ji2]], axis=0)
-	
-  return C
+	transformed_xy = (np.matmul(rot(q[2]), curr_scan.T) + np.tile((q[:2].reshape(-1,1)),(1,N))).T
+	C = np.zeros([N, 3]).astype(int)
 
-def search_correspondence_brute(curr_scan, prev_scan, q):
-    transformed_xy = np.matmul(rot(q[2]),curr_scan.T).T + q[:2]
-    # pdb.set_trace()
-    C = np.empty([len(transformed_xy), 3])
-    # new_node = np.asarray(new_node).reshape(-1, 2)
-    # old_node = old_node.reshape(-1, 2)
-    C[:, 0] = np.arange(len(transformed_xy)).T
-    # pdb.set_trace()
-    # C[:, 1] = (np.argmin(cdist(prev_scan, transformed_xy), axis=0))
-    # pdb.set_trace()
-    C[:, 1:3] = cdist(transformed_xy, prev_scan).argsort(axis=1)[:, :2]
-    # C = C.astype(int)
-    # prev_scan[C[:, 1] == len(prev_scan) or prev_scan[C[:, 1] + 1]] > prev_scan[C[:, 1] - 1]
-    # pdb.set_trace()
-    # C[:, 2] = C[:, 1] + 1
-    # pdb.set_trace()
-    # C[C[:,2] == len(prev_scan), 2] = len(prev_scan) - 2
-    C = C.astype(int)
-    return C
-
+	for i in range(N):
+		C[i,0] = i
+		ji1 = closest_node(transformed_xy[i,:],prev_scan)
+		C[i,1] = ji1
+		if (ji1 == 0):
+	  		C[i,2] = 1
+		elif (ji1 == (N-1)):
+	  		C[i,2] = N-2
+		else:
+			C[i,2] = (ji1 - 1) if (np.sum((prev_scan[(ji1-1),:] - transformed_xy[i,:])**2) 
+				< np.sum((prev_scan[ji1+1,:] - transformed_xy[i,:])**2)) else (ji1 + 1)
+	return C
 
 # input: node [1,2], nodes [N,2]
 def closest_node(node, nodes):
@@ -685,8 +544,8 @@ def get_q(p1,p2,C):
 
 	for i in range(len(C)):
 
-		M_k = np.array([[1 , 0, p1[i,0], -p1[i,1] ], \
-			[ 0 , 1, p1[i,1], p1[i,0] ]])
+		M_k = np.array([[1 , 0, p1[C[i,0],0], -p1[C[i,0],1] ], \
+			[ 0 , 1, p1[C[i,0],1], p1[C[i,0],0] ]])
 
 		n_k = np.matmul(normalize(p2[C[i,1],:] - p2[C[i,2],:]).reshape(1,2),rot(3.14159/2.)).reshape(2,1)
 
@@ -722,8 +581,7 @@ def get_q(p1,p2,C):
 
 	x = fx(lam)
 
-	#theta = np.arctan(x[3,0]/x[2,0]) # theta is in radian
-	theta = np.arctan2(x[3,0], x[2,0])
+	theta = np.arctan(x[3,0]/x[2,0]) # theta is in radian
 
 	# print "error: ",(g.T*((2*M + 2*lam*W).I)*W*((2*M + 2*lam*W).I).T*g)[0,0] - 1
 

@@ -210,9 +210,6 @@ def scan_callback(data):
 	if (g.euc_length > min_gap_len) and (g.delta_angle > min_gap_ang):
 		gaps_data.data.append(g)
 
-
-
-
 	## decide the gap center to use
 	gap_center = find_gap_center(gaps_data)
 
