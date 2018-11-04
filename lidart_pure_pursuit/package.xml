@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>lab_pure_pursuit</name>
+  <name>lidart_pure_pursuit</name>
   <version>0.0.0</version>
   <description>The lab_pure_pursuit package</description>
 

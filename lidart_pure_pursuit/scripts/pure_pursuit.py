@@ -12,12 +12,13 @@ from tf.transformations import quaternion_from_euler
 import csv
 import os
 import sys
+import pdb
 
 #############
 # CONSTANTS #
 #############
 
-LOOKAHEAD_DISTANCE = 2.0 # meters
+LOOKAHEAD_DISTANCE = 0.25 # meters
 VELOCITY = 1.0 # m/s
 
 
@@ -32,7 +33,7 @@ with open(filename) as f:
     path_points = [tuple(line) for line in csv.reader(f)]
 
 # Turn path_points into a list of floats to eliminate the need for casts in the code below.
-path_points = [(float(point[0]), float(point[1]), float(point[2])) for point in path_points]
+path_points = [[float(point[0]), float(point[1]), float(point[2])] for point in path_points]
         
 # Publisher for 'drive_parameters' (speed and steering angle)
 pub = rospy.Publisher('drive_parameters', drive_param, queue_size=1)
@@ -51,7 +52,9 @@ def dist(p1, p2):
 
 
 def closest_node(node, nodes):
-    nodes = np.asarray(nodes)
+    nodes = np.array(nodes)
+    # node = node.reshape((1, -1))
+    # nodes = nodes.reshape((len(nodes), -1))
     deltas = nodes - node
     dist_2 = np.einsum('ij,ij->i', deltas, deltas)
     return np.argmin(dist_2)
@@ -68,27 +71,30 @@ def callback(data):
     y = data.pose.position.y
     z = data.pose.position.z
     yaw = euler[2]
-    odom_point = [x, y, z]
+    pf_point = np.array([x, y, z])
+    # print(odom_point)
 
 
     # 2. Find the path point closest to the vehicle that is >= 1 lookahead distance from vehicle's current location.
     last_distance = sys.maxint
-    closest_point_to_odom = closest_node(odom_point, path_points)
-
-    for i in range(closest_point_to_odom, len(path_points)):
-        distance = dist(odom_point, path_points[i])
-        if distance >= LOOKAHEAD_DISTANCE and distance < last_distance:
+    closest_point_to_pf = closest_node(pf_point, path_points)
+    # print((closest_point_to_odom))
+    for i in range(closest_point_to_pf, len(path_points)):
+    # for i in range(0, len(path_points)):
+        distance = dist(pf_point, path_points[i])
+        if distance >= LOOKAHEAD_DISTANCE:
             last_distance = distance
-            closest_point = path_points[i]
+            closest_point = np.array(path_points[i])
+    	    break
 
     # 3. Transform the goal point to vehicle coordinates. 
-    transformed_point = closest_point - odom_point
+    transformed_point = closest_point - pf_point
     
 
     # 4. Calculate the curvature = 1/r = 2x/l^2
     # The curvature is transformed into steering wheel angle by the vehicle on board controller.
     # Hint: You may need to flip to negative because for the VESC a right steering angle has a negative value.
-    angle = 2*transformed_point[0]/LOOKAHEAD_DISTANCE**2
+    angle = -2*transformed_point[0]/LOOKAHEAD_DISTANCE**2
 
     
     angle = np.clip(angle, -0.4189, 0.4189) # 0.4189 radians = 24 degrees because car can only turn 24 degrees max
