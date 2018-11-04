@@ -9,6 +9,7 @@ from geometry_msgs.msg import PoseStamped, Pose
 from gazebo_msgs.msg import ModelStates
 from gazebo_msgs.srv import GetModelState
 from std_msgs.msg import Header
+import pdb
 
 pub = rospy.Publisher("pf/viz/inferred_pose", PoseStamped, queue_size=1)
 
@@ -28,6 +29,7 @@ def robot_pose_update(data):
     # Break out of this callback if racecar not properly initialized in Gazebo yet so that we don't see red error statements in Terminal about no index of "racecar" in names.
     if len(names) < 2:
         return
+
     racecar_index = names.index("racecar")
     racecar_pose = data.pose[racecar_index]
 

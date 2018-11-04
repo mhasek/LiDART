@@ -18,15 +18,16 @@ import pdb
 # CONSTANTS #
 #############
 
-LOOKAHEAD_DISTANCE = 0.25 # meters
+LOOKAHEAD_DISTANCE = 1.0 # meters
 VELOCITY = 1.0 # m/s
-
+PF_FREQUENCY = 40.0 # prone to change if not in simulator
 
 ###########
 # GLOBALS #
 ###########
 
 # Import waypoints.csv into a list (path_points)
+# path_points: (x,y,theta)
 dirname = os.path.dirname(__file__)
 filename = os.path.join(dirname, '../waypoints/levine-waypoints.csv')
 with open(filename) as f:
@@ -34,6 +35,8 @@ with open(filename) as f:
 
 # Turn path_points into a list of floats to eliminate the need for casts in the code below.
 path_points = [[float(point[0]), float(point[1]), float(point[2])] for point in path_points]
+# change path_points into np array to simply processing
+path_points = np.array(path_points)[:,:2]
         
 # Publisher for 'drive_parameters' (speed and steering angle)
 pub = rospy.Publisher('drive_parameters', drive_param, queue_size=1)
@@ -52,50 +55,42 @@ def dist(p1, p2):
 
 
 def closest_node(node, nodes):
-    nodes = np.array(nodes)
-    # node = node.reshape((1, -1))
-    # nodes = nodes.reshape((len(nodes), -1))
     deltas = nodes - node
-    dist_2 = np.einsum('ij,ij->i', deltas, deltas)
+    dist_2 = np.einsum('ij,ij->i', deltas, deltas) # returns squared distance of each xy pair in deltas
     return np.argmin(dist_2)
 
 def callback(data):
 
     # Note: These following numbered steps below are taken from R. Craig Coulter's paper on pure pursuit.
 
-    # 1. Determine the current location of the vehicle (we are subscribed to vesc/odom)
+    # 1. Determine the current location of the vehicle (we are subscribed to vesc/odom) <- /pf/viz/inferred_pose
     # Hint: Read up on PoseStamped message type in ROS to determine how to extract x, y, and yaw.
     euler = euler_from_quaternion((data.pose.orientation.x, data.pose.orientation.y,
                                    data.pose.orientation.z, data.pose.orientation.w))
     x = data.pose.position.x
     y = data.pose.position.y
-    z = data.pose.position.z
     yaw = euler[2]
-    pf_point = np.array([x, y, z])
-    # print(odom_point)
-
+    pf_point = np.array([x, y])
+    # print(pf_point)
 
     # 2. Find the path point closest to the vehicle that is >= 1 lookahead distance from vehicle's current location.
-    last_distance = sys.maxint
-    closest_point_to_pf = closest_node(pf_point, path_points)
-    # print((closest_point_to_odom))
-    for i in range(closest_point_to_pf, len(path_points)):
-    # for i in range(0, len(path_points)):
-        distance = dist(pf_point, path_points[i])
-        if distance >= LOOKAHEAD_DISTANCE:
-            last_distance = distance
-            closest_point = np.array(path_points[i])
-    	    break
+    next_waypoint = closest_node(pf_point, path_points)
+    distance = dist(pf_point, path_points[next_waypoint])
+    # for i in range(closest_point_to_pf, len(path_points)):
+    while distance < LOOKAHEAD_DISTANCE and next_waypoint < len(path_points) - 1:
+        next_waypoint += 1
+        distance = dist(pf_point, path_points[next_waypoint])
 
     # 3. Transform the goal point to vehicle coordinates. 
-    transformed_point = closest_point - pf_point
-    
+    transformed_point = path_points[next_waypoint] - pf_point
 
     # 4. Calculate the curvature = 1/r = 2x/l^2
     # The curvature is transformed into steering wheel angle by the vehicle on board controller.
     # Hint: You may need to flip to negative because for the VESC a right steering angle has a negative value.
-    angle = -2*transformed_point[0]/LOOKAHEAD_DISTANCE**2
-
+    curvature = 2*transformed_point[0]/LOOKAHEAD_DISTANCE**2
+    angle = np.arctan2(curvature * VELOCITY / PF_FREQUENCY, 1)
+    print(angle)
+    # pdb.set_trace()
     
     angle = np.clip(angle, -0.4189, 0.4189) # 0.4189 radians = 24 degrees because car can only turn 24 degrees max
 
