@@ -8,8 +8,8 @@
   	</include>
   
   	<!-- Run map server -->
-	<!-- <arg name="map_file" default="$(find lidart_pure_pursuit)/maps/levine.yaml" />
-	<node name="map_server" pkg="map_server" type="map_server" args="$(arg map_file)" /> -->
+	<arg name="map_file" default="$(find lidart_pure_pursuit)/maps/levine.yaml" />
+	<node name="map_server" pkg="map_server" type="map_server" args="$(arg map_file)" />
 
 	<node pkg="lidart_pure_pursuit" name="remap_gazebo_pose_node" type="remap_gazebo_pose.py" output="screen" />
   	<node pkg="lidart_pure_pursuit" name="pure_pursuit_node" type="pure_pursuit.py" output="screen"/> 

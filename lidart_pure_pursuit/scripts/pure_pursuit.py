@@ -9,6 +9,7 @@ from numpy import linalg as LA
 import tf.transformations
 from tf.transformations import euler_from_quaternion
 from tf.transformations import quaternion_from_euler
+from visualization_msgs.msg import Marker
 import csv
 import os
 import sys
@@ -18,9 +19,9 @@ import pdb
 # CONSTANTS #
 #############
 
-LOOKAHEAD_DISTANCE = 1.0 # meters
-VELOCITY = 1.0 # m/s
-PF_FREQUENCY = 40.0 # prone to change if not in simulator
+LOOKAHEAD_DISTANCE = 1 # meters
+VELOCITY = 0.5 # m/s
+L = 0.325 # meters
 
 ###########
 # GLOBALS #
@@ -37,10 +38,12 @@ with open(filename) as f:
 path_points = [[float(point[0]), float(point[1]), float(point[2])] for point in path_points]
 # change path_points into np array to simply processing
 path_points = np.array(path_points)[:,:2]
+path_points = path_points
         
 # Publisher for 'drive_parameters' (speed and steering angle)
 pub = rospy.Publisher('drive_parameters', drive_param, queue_size=1)
-
+pub_waypoint_marker = rospy.Publisher('next_waypoint_viz', Marker, queue_size="1")
+pub_pf_marker = rospy.Publisher('pf_point_viz', Marker, queue_size="1")
 
 #############
 # FUNCTIONS #
@@ -82,18 +85,60 @@ def callback(data):
         distance = dist(pf_point, path_points[next_waypoint])
 
     # 3. Transform the goal point to vehicle coordinates. 
-    transformed_point = path_points[next_waypoint] - pf_point
+    waypoint_value = path_points[next_waypoint,:]
+    transform_vector = waypoint_value - pf_point
+    transform_mat = np.array([[np.cos(yaw),np.sin(yaw)],[-np.sin(yaw),np.cos(yaw)]])
+    transform_vector_local = np.matmul(transform_mat,transform_vector)
 
     # 4. Calculate the curvature = 1/r = 2x/l^2
     # The curvature is transformed into steering wheel angle by the vehicle on board controller.
     # Hint: You may need to flip to negative because for the VESC a right steering angle has a negative value.
-    curvature = 2*transformed_point[0]/LOOKAHEAD_DISTANCE**2
-    angle = np.arctan2(curvature * VELOCITY / PF_FREQUENCY, 1)
-    print(angle)
+    curvature = 2*transform_vector_local[1]/LOOKAHEAD_DISTANCE**2
+    angle = np.arctan2(curvature * L, 1)
+    print(path_points[next_waypoint])
+    print(distance)
+    print(next_waypoint)
+
+    # next waypoint marker
+    marker = Marker()
+    marker.header.frame_id = "/map"
+    marker.type = marker.SPHERE
+    marker.action = marker.ADD
+    marker.scale.x = 0.2
+    marker.scale.y = 0.2
+    marker.scale.z = 0.2
+    marker.color.a = 1.0
+    marker.color.r = 0.0
+    marker.color.g = 0.0
+    marker.color.b = 1.0
+    marker.pose.orientation.w = 1.0
+    marker.pose.position.x = waypoint_value[0]
+    marker.pose.position.y = waypoint_value[1]
+    marker.pose.position.z = 0
+    pub_waypoint_marker.publish(marker)
+
+    # pf_point marker
+    marker2 = Marker()
+    marker2.header.frame_id = "/map"
+    marker2.type = marker2.SPHERE
+    marker2.type = marker2.ADD
+    marker2.scale.x = 0.2
+    marker2.scale.y = 0.2
+    marker2.scale.z = 0.2
+    marker2.color.a = 1.0
+    marker2.color.r = 0.0
+    marker2.color.g = 1.0
+    marker2.color.b = 0.0
+    marker2.pose.orientation.w = 1.0
+    marker2.pose.position.x = pf_point[0]
+    marker2.pose.position.y = pf_point[1]
+    marker2.pose.position.z = 0
+    pub_pf_marker.publish(marker2)
+
     # pdb.set_trace()
     
     angle = np.clip(angle, -0.4189, 0.4189) # 0.4189 radians = 24 degrees because car can only turn 24 degrees max
-
+    print(angle)
     msg = drive_param()
     msg.velocity = VELOCITY
     msg.angle = angle
