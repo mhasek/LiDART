@@ -19,9 +19,15 @@ import pdb
 # CONSTANTS #
 #############
 
-LOOKAHEAD_DISTANCE = 1 # meters
-VELOCITY = 0.5 # m/s
+LOOKAHEAD_DISTANCE = 0.7 # meters
+MAX_VELOCITY = 2 # m/s
 L = 0.325 # meters
+FAR_DISTANCE_L_COEFF = 1.5
+FAR_DISTANCE_V_COEFF = 0.2
+DIFF_ANGLE_V_COEFF = 1.0
+CURR_ANGLE_V_COEFF = 1.0
+VELOCITY_BASE = 1.0
+VELOCITY = 1.0
 
 ###########
 # GLOBALS #
@@ -30,7 +36,7 @@ L = 0.325 # meters
 # Import waypoints.csv into a list (path_points)
 # path_points: (x,y,theta)
 dirname = os.path.dirname(__file__)
-filename = os.path.join(dirname, '../waypoints/levine-waypoints.csv')
+filename = os.path.join(dirname, '../waypoints/test.csv')
 with open(filename) as f:
     path_points = [tuple(line) for line in csv.reader(f)]
 
@@ -44,6 +50,7 @@ path_points = path_points
 pub = rospy.Publisher('drive_parameters', drive_param, queue_size=1)
 pub_waypoint_marker = rospy.Publisher('next_waypoint_viz', Marker, queue_size="1")
 pub_pf_marker = rospy.Publisher('pf_point_viz', Marker, queue_size="1")
+pub_far_ahead_waypoint_marker = rospy.Publisher('far_ahead_point_viz', Marker, queue_size="1")
 
 #############
 # FUNCTIONS #
@@ -61,6 +68,12 @@ def closest_node(node, nodes):
     deltas = nodes - node
     dist_2 = np.einsum('ij,ij->i', deltas, deltas) # returns squared distance of each xy pair in deltas
     return np.argmin(dist_2)
+
+def velocity(angle, far_ahead_angle):
+    velocity = VELOCITY_BASE
+    velocity += (1-abs(angle/np.deg2rad(30)))*CURR_ANGLE_V_COEFF
+    velocity += (1-abs((angle-far_ahead_angle)/np.deg2rad(30)))*DIFF_ANGLE_V_COEFF
+    return min(velocity, MAX_VELOCITY)
 
 def callback(data):
 
@@ -80,9 +93,16 @@ def callback(data):
     next_waypoint = closest_node(pf_point, path_points)
     distance = dist(pf_point, path_points[next_waypoint])
     # for i in range(closest_point_to_pf, len(path_points)):
-    while distance < LOOKAHEAD_DISTANCE and next_waypoint < len(path_points) - 1:
-        next_waypoint += 1
+    while distance < LOOKAHEAD_DISTANCE :
+        next_waypoint = (next_waypoint + 1) % len(path_points)
         distance = dist(pf_point, path_points[next_waypoint])
+
+    far_ahead_waypoint = next_waypoint
+    far_distance = dist(pf_point, path_points[far_ahead_waypoint])
+    while far_distance < LOOKAHEAD_DISTANCE * (FAR_DISTANCE_L_COEFF - 1) + distance + FAR_DISTANCE_V_COEFF * MAX_VELOCITY :
+	far_ahead_waypoint = (far_ahead_waypoint + 1) % len(path_points)
+        far_distance = dist(pf_point, path_points[far_ahead_waypoint])
+
 
     # 3. Transform the goal point to vehicle coordinates. 
     waypoint_value = path_points[next_waypoint,:]
@@ -90,11 +110,17 @@ def callback(data):
     transform_mat = np.array([[np.cos(yaw),np.sin(yaw)],[-np.sin(yaw),np.cos(yaw)]])
     transform_vector_local = np.matmul(transform_mat,transform_vector)
 
+    far_ahead_waypoint_value = path_points[far_ahead_waypoint,:]
+    far_ahead_transform_vector = far_ahead_waypoint_value - pf_point
+    far_ahead_transform_vector_local = np.matmul(transform_mat,far_ahead_transform_vector)
+
     # 4. Calculate the curvature = 1/r = 2x/l^2
     # The curvature is transformed into steering wheel angle by the vehicle on board controller.
     # Hint: You may need to flip to negative because for the VESC a right steering angle has a negative value.
-    curvature = 2*transform_vector_local[1]/LOOKAHEAD_DISTANCE**2
+    curvature = 2*transform_vector_local[1]/distance**2
+    far_ahead_curvature = 2*far_ahead_transform_vector_local[1]/far_distance**2
     angle = np.arctan2(curvature * L, 1)
+    far_ahead_angle = np.arctan2(far_ahead_curvature * L, 1)
     print(path_points[next_waypoint])
     print(distance)
     print(next_waypoint)
@@ -116,6 +142,24 @@ def callback(data):
     marker.pose.position.y = waypoint_value[1]
     marker.pose.position.z = 0
     pub_waypoint_marker.publish(marker)
+
+    # far ahead waypoint marker
+    marker3 = Marker()
+    marker3.header.frame_id = "/map"
+    marker3.type = marker3.SPHERE
+    marker3.action = marker3.ADD
+    marker3.scale.x = 0.2
+    marker3.scale.y = 0.2
+    marker3.scale.z = 0.2
+    marker3.color.a = 1.0
+    marker3.color.r = 0.0
+    marker3.color.g = 0.0
+    marker3.color.b = 0.0
+    marker3.pose.orientation.w = 1.0
+    marker3.pose.position.x = far_ahead_waypoint_value[0]
+    marker3.pose.position.y = far_ahead_waypoint_value[1]
+    marker3.pose.position.z = 0
+    pub_far_ahead_waypoint_marker.publish(marker3)
 
     # pf_point marker
     marker2 = Marker()
@@ -140,6 +184,7 @@ def callback(data):
     angle = np.clip(angle, -0.4189, 0.4189) # 0.4189 radians = 24 degrees because car can only turn 24 degrees max
     print(angle)
     msg = drive_param()
+    # msg.velocity = velocity(angle, far_ahead_angle)
     msg.velocity = VELOCITY
     msg.angle = angle
     pub.publish(msg)

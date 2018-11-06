@@ -1,0 +1,7 @@
+image: levine_map1.pgm
+resolution: 0.050000
+origin: [-38.881595, -8.232410, 0.000000]
+negate: 0
+occupied_thresh: 0.65
+free_thresh: 0.196
+
