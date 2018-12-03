@@ -1,0 +1,12 @@
+local_costmap:
+  global_frame: map #not sure
+  robot_base_frame: base_link
+  update_frequency: 10
+  publish_frequency: 8
+  static_map: false
+  rolling_window: true
+  width: 12
+  height: 12
+## TEB
+
+  resolution: 0.05
