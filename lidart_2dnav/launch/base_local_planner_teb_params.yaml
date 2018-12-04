@@ -29,12 +29,15 @@ TebLocalPlannerROS:
   map_frame: /base_link
   acc_lim_x: 2.5
   acc_lim_theta: 1.00
-  wheelbase: 0.25
-  max_vel_x: 2.00
-  max_vel_x_backwards: 1.00
-  max_vel_theta: 0.5
+  wheelbase: 0.325
+  max_vel_x: 3.00
+  max_vel_x_backwards: 0.00
+  max_vel_theta: 2.00
   cmd_angle_instead_rotvel: true
   free_goal_vel: true
   min_turning_radius: 0.76
   yaw_goal_tolerance: 3.14 # So angle doesn't matter
-  xy_goal_tolerance:  0.200
+  xy_goal_tolerance:  1.00
+  min_obstacle_dist: 0.10
+  free_goal_vel: true
+  # max_global_plan_lookahead_dist: 1.00

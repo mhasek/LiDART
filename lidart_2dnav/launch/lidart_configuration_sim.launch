@@ -4,7 +4,7 @@
 <!--	This launch file uses the true x, y coordinates from Gazebo and maps it to /pf/viz/inferred_pose to insert into pure_pursuit code.-->
   	<include file="$(find racecar_gazebo)/launch/racecar.launch">
 		  <arg name="world_name" value="offset_levine"/>
-		  <arg name="gui" value="true"/>
+		  <arg name="gui" value="false"/>
   	</include>
 
     <node pkg="lidart_pure_pursuit" name="remap_gazebo_pose_node" type="remap_gazebo_pose.py" output="screen" />

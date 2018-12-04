@@ -7,7 +7,7 @@ from race.msg import drive_param
 from geometry_msgs.msg import Twist
 
 pub = rospy.Publisher('drive_parameters', drive_param, queue_size=1)
-WHEELBASE_LENGTH = 0.250
+WHEELBASE_LENGTH = 0.325
 
 def callback(data):
     vx = data.linear.x
@@ -16,12 +16,20 @@ def callback(data):
     velocity = math.sqrt(vx**2 + vy**2)
     angle = math.atan2(WHEELBASE_LENGTH * theta_dot, velocity)
     msg = drive_param()
+
+
+
     msg.velocity = velocity
     msg.angle = angle
 
     ## FOR TEB
     msg.velocity = data.linear.x
+    if data.linear.x == 0 or data.angular.z == 0:
+        msg.angle = 0
+    else:
+        msg.angle = math.atan2(WHEELBASE_LENGTH, data.linear.x/data.angular.z)
     msg.angle = data.angular.z
+
     pub.publish(msg)
 
 if __name__ == '__main__':
