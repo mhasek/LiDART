@@ -3,7 +3,7 @@
 
 <!--	This launch file uses the true x, y coordinates from Gazebo and maps it to /pf/viz/inferred_pose to insert into pure_pursuit code.-->
   	<include file="$(find racecar_gazebo)/launch/racecar.launch">
-		  <arg name="world_name" value="offset_levine"/>
+		  <arg name="world_name" value="track_levine"/>
 		  <arg name="gui" value="false"/>
   	</include>
 

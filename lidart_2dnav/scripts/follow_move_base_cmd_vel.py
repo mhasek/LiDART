@@ -28,7 +28,7 @@ def callback(data):
         msg.angle = 0
     else:
         msg.angle = math.atan2(WHEELBASE_LENGTH, data.linear.x/data.angular.z)
-    msg.angle = data.angular.z
+    # msg.angle = data.angular.z
 
     pub.publish(msg)
 

@@ -25,8 +25,8 @@ TrajectoryPlannerROS:
   holonomic_robot: false
 
 TebLocalPlannerROS:
-  odom_topic: /pf/viz/odom
-  map_frame: /base_link
+  odom_topic: /pf/pose/odom
+  map_frame: /map
   acc_lim_x: 2.5
   acc_lim_theta: 1.00
   wheelbase: 0.325
@@ -40,4 +40,4 @@ TebLocalPlannerROS:
   xy_goal_tolerance:  1.00
   min_obstacle_dist: 0.10
   free_goal_vel: true
-  # max_global_plan_lookahead_dist: 1.00
+  max_global_plan_lookahead_dist: 0.1
