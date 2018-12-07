@@ -8,8 +8,12 @@ from geometry_msgs.msg import Twist
 
 pub = rospy.Publisher('drive_parameters', drive_param, queue_size=1)
 WHEELBASE_LENGTH = 0.325
+vel = 0
+ang = 0
 
 def callback(data):
+    global vel
+    global ang
     vx = data.linear.x
     vy = data.linear.y
     theta_dot = data.angular.z
@@ -28,11 +32,25 @@ def callback(data):
         msg.angle = 0
     else:
         msg.angle = math.atan2(WHEELBASE_LENGTH, data.linear.x/data.angular.z)
-    # msg.angle = data.angular.z
+    msg.angle = data.angular.z
 
-    pub.publish(msg)
+    # pub.publish(msg)
+
+    ## THIS PREVENTS THE LOCAL PLANNER FROM SENDING 0's
+    if msg.velocity != 0:
+        vel = msg.velocity
+    if msg.angle !=0:
+        ang = msg.angle
+
 
 if __name__ == '__main__':
     rospy.init_node('follow_move_base_cmd_vel')
+    r = rospy.Rate(40)
     rospy.Subscriber('/cmd_vel', Twist, callback, queue_size=1)
-    rospy.spin()
+    msg = drive_param()
+
+    while not rospy.is_shutdown():
+        msg.angle = ang
+        msg.velocity = vel
+        pub.publish(msg)
+        r.sleep()
