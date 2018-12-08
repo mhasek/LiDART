@@ -13,13 +13,15 @@ theta_array = []
 first_scan = True
 counter = 0
 
-OCCUPANCY_GRID_HEIGHT = 4.0 # in meters
-OCCUPANCY_GRID_WIDTH = 4.0 # in meters
-RESOLUTION = 4.0 # boxes per meter
+OCCUPANCY_GRID_HEIGHT = 7.0 # in meters
+OCCUPANCY_GRID_WIDTH = 7.0 # in meters
+RESOLUTION = 5.0 # boxes per meter
+PIXEL_HEIGHT = int(OCCUPANCY_GRID_HEIGHT*RESOLUTION)
+PIXEL_WIDTH = int(OCCUPANCY_GRID_WIDTH*RESOLUTION)
 
-current_occupancy_grid = np.zeros((int(OCCUPANCY_GRID_WIDTH*RESOLUTION), int(OCCUPANCY_GRID_HEIGHT*RESOLUTION)))
-radius_map = np.zeros((int(OCCUPANCY_GRID_WIDTH*RESOLUTION), int(OCCUPANCY_GRID_HEIGHT*RESOLUTION)))
-theta_map = np.zeros((int(OCCUPANCY_GRID_WIDTH*RESOLUTION), int(OCCUPANCY_GRID_HEIGHT*RESOLUTION)))
+current_occupancy_grid = np.zeros((PIXEL_WIDTH, PIXEL_HEIGHT))
+radius_map = np.zeros((PIXEL_WIDTH, PIXEL_HEIGHT))
+theta_map = np.zeros((PIXEL_WIDTH, PIXEL_HEIGHT))
 
 def create_theta_array(scan):
     theta_min = scan.angle_min
@@ -31,12 +33,11 @@ def create_theta_array(scan):
 def create_radius_array():
     global radius_map
     global theta_map
-    for row in range(0, int(OCCUPANCY_GRID_WIDTH*RESOLUTION)):
-        for col in range(0, int(OCCUPANCY_GRID_HEIGHT*RESOLUTION)):
-            w = int(OCCUPANCY_GRID_WIDTH*RESOLUTION)
-            x_local = row - w/2
-            radius_map[col][row] = np.sqrt(x_local**2 + col**2)
-            theta_map[col][row] = np.arctan2(col, x_local)
+    for row in range(0, PIXEL_WIDTH):
+        for col in range(0, PIXEL_HEIGHT):
+            x_local = row - PIXEL_WIDTH/2
+            radius_map[col, row] = np.sqrt(x_local**2 + col**2)
+            theta_map[col, row] = np.arctan2(col, x_local)
 
 
 def callback(data):
@@ -46,7 +47,6 @@ def callback(data):
     global current_occupancy_grid
     global theta_array
     global first_scan
-    global figz
 
     # Only get theta array once
     if first_scan:
@@ -69,12 +69,34 @@ def callback(data):
 
     x = x[box_constraint]
     y = y[box_constraint]
+    # plt.axis([0, int(OCCUPANCY_GRID_WIDTH*RESOLUTION), 0, int(OCCUPANCY_GRID_HEIGHT*RESOLUTION)])
+    # plt.show()
+
 
     # Converts to numpy array centered at top left
-    occupancy_from_car = np.zeros((int(OCCUPANCY_GRID_WIDTH*RESOLUTION), int(OCCUPANCY_GRID_HEIGHT*RESOLUTION)))
-    y_np = (x*RESOLUTION).astype(int)
-    x_np = ((y + (OCCUPANCY_GRID_WIDTH/2.0))*RESOLUTION).astype(int)
+    occupancy_from_car = np.zeros((PIXEL_WIDTH, PIXEL_HEIGHT))
+
+    y_np = (PIXEL_HEIGHT - x*RESOLUTION).astype(int)
+    # y_np = ((y + (OCCUPANCY_GRID_WIDTH/2.0))*RESOLUTION).astype(int)
+    x_np = (y*RESOLUTION + PIXEL_WIDTH/2.0).astype(int)
+    # pdb.set_trace()
     occupancy_from_car[y_np, x_np] = 1
+    # np.set_printoptions(threshold=np.nan)
+    # pdb.set_trace()
+
+
+    # w = PIXEL_WIDTH
+    # pdb.set_trace()
+
+
+    # Raytraces obstacles
+    # current_radius_map = radius_map
+    # current_theta_map = theta_map
+    # filtered_scan = filtered_scan[box_constraint]
+    # filtered_angles = filtered_angles[box_constraint]
+
+    # print(occupancy_from_car)
+    # pdb.set_trace()
 
     ## THIS WILL SHOW YOU
     # plt.axis([0, int(OCCUPANCY_GRID_WIDTH*RESOLUTION), 0, int(OCCUPANCY_GRID_HEIGHT*RESOLUTION)])
@@ -103,12 +125,15 @@ if __name__ == '__main__':
     rate = rospy.Rate(10)
     rospy.Subscriber("/scan", LaserScan, callback)
     pub = rospy.Publisher('grid_path', numpy_msg(Floats), queue_size=10)
-    # create_radius_array()
+    create_radius_array()
+    # print(theta_map)
+    # print(theta_map)
+    # pdb.set_trace()
     # pdb.set_trace()
     # pub = rospy.Publisher('floats', numpy_msg(Floats), queue_size=10)
     while not rospy.is_shutdown():
-        pub.publish(current_occupancy_grid)
-        print("PUBLISHING")
+        # pub.publish(current_occupancy_grid)
+        # print("PUBLISHING")
         rate.sleep()
         # pub.publish(current_occupancy_grid)
         # rate.sleep()
