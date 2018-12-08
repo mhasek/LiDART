@@ -51,6 +51,7 @@ find_package(catkin REQUIRED COMPONENTS
 add_message_files(
    FILES
    OccupancyGrid.msg
+   local_rrt_result.msg
 #   Message2.msg
 )
 

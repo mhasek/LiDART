@@ -18,7 +18,7 @@ counter = 0
 
 OCCUPANCY_GRID_HEIGHT = 3.0 # in meters
 OCCUPANCY_GRID_WIDTH = 3.0 # in meters
-RESOLUTION = 40.0 # boxes per meter
+RESOLUTION = 4.0 # boxes per meter
 PIXEL_HEIGHT = int(OCCUPANCY_GRID_HEIGHT*RESOLUTION)
 PIXEL_WIDTH = int(OCCUPANCY_GRID_WIDTH*RESOLUTION)
 
@@ -159,7 +159,7 @@ if __name__ == '__main__':
     rospy.Subscriber("/next_point", Point, next_point_callback)
     # pub = rospy.Publisher('grid_path', numpy_msg(Floats), queue_size=10)
     create_radius_array()
-    pub = rospy.Publisher('Grid', OccupancyGrid, queue_size=10)
+    pub = rospy.Publisher('grid', OccupancyGrid, queue_size=10)
     # pub = rospy.Publisher('floats', numpy_msg(Floats), queue_size=10)
     while not rospy.is_shutdown():
         pub.publish(occupancy_grid)

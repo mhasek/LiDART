@@ -1,0 +1,3 @@
+bool follow_local_path
+rospy_tutorials/Floats global_path
+geometry_msgs/Point goal_point
