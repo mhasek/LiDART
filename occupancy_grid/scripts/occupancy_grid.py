@@ -8,6 +8,9 @@ import pdb
 import matplotlib.pyplot as plt
 from rospy.numpy_msg import numpy_msg
 from rospy_tutorials.msg import Floats
+from nav_msgs.msg import Odometry
+from occupancy_grid.msg import OccupancyGrid
+from geometry_msgs.msg import Point
 
 theta_array = []
 first_scan = True
@@ -22,6 +25,10 @@ PIXEL_WIDTH = int(OCCUPANCY_GRID_WIDTH*RESOLUTION)
 current_occupancy_grid = np.zeros((PIXEL_WIDTH, PIXEL_HEIGHT))
 radius_map = np.zeros((PIXEL_WIDTH, PIXEL_HEIGHT))
 theta_map = np.zeros((PIXEL_WIDTH, PIXEL_HEIGHT))
+
+current_odom = Odometry()
+occupancy_grid_pub = OccupancyGrid()
+next_point_ = Point()
 
 def create_theta_array(scan):
     theta_min = scan.angle_min
@@ -50,6 +57,9 @@ def callback(data):
     global theta_array
     global first_scan
 
+    occupancy_grid_pub.goal_point = next_point_
+    occupancy_grid.pub.current_odom = current_odom
+
     # Only get theta array once
     if first_scan:
         theta_array = create_theta_array(data)
@@ -68,23 +78,16 @@ def callback(data):
 
     # Puts values in given box size for occupancy grid
     box_constraint = (x < OCCUPANCY_GRID_HEIGHT) & (x > 0) & (np.abs(y) < OCCUPANCY_GRID_WIDTH/2.0)
-
     x = x[box_constraint]
     y = y[box_constraint]
-    # plt.axis([0, int(OCCUPANCY_GRID_WIDTH*RESOLUTION), 0, int(OCCUPANCY_GRID_HEIGHT*RESOLUTION)])
-    # plt.show()
 
 
     # Converts to numpy array centered at top left
     occupancy_from_car = np.zeros((PIXEL_WIDTH, PIXEL_HEIGHT))
 
     y_np = (PIXEL_HEIGHT - x*RESOLUTION).astype(int)
-    # y_np = ((y + (OCCUPANCY_GRID_WIDTH/2.0))*RESOLUTION).astype(int)
     x_np = (y*RESOLUTION + PIXEL_WIDTH/2.0).astype(int)
-    # pdb.set_trace()
     occupancy_from_car[y_np, x_np] = 1
-    # np.set_printoptions(threshold=np.nan)
-    # pdb.set_trace()
 
     pairs = np.array([x_np, y_np]).T
 
@@ -100,6 +103,7 @@ def callback(data):
     current_theta_map = theta_map
     filtered_scan = filtered_scan[box_constraint]
     filtered_angles = filtered_angles[box_constraint]
+
     # mark behind scans as black
     for pair in unique_pairs:
         x_ = pair[0]
@@ -109,17 +113,7 @@ def callback(data):
         r_loc = np.sqrt((x_loc)**2 + (y_loc)**2)
         theta = np.arctan2(x_loc, y_loc)
         raytrace_mask = (current_radius_map > r_loc) & (np.abs(current_theta_map - theta) < np.deg2rad(2.0))
-        # pdb.set_trace()
         occupancy_from_car[raytrace_mask] = 1.0
-
-
-    # w = PIXEL_WIDTH
-    # pdb.set_trace()
-
-
-
-    # print(occupancy_from_car)
-    # pdb.set_trace()
 
     ## THIS WILL SHOW YOU
     # plt.axis([0, int(OCCUPANCY_GRID_WIDTH*RESOLUTION), 0, int(OCCUPANCY_GRID_HEIGHT*RESOLUTION)])
@@ -147,20 +141,28 @@ def callback(data):
     # plt.show()
     # plt.gcf().clear()
     current_occupancy_grid = occupancy_from_car
+    occupancy_grid.occupancy_grid = current_occupancy_grid
+
+def odom_callback(data):
+    global current_odom
+    current_odom = data
+
+def next_point_callback(data):
+    global next_point_
+    next_point_ = data
 
 if __name__ == '__main__':
     rospy.init_node('generate_occupancy_grid', anonymous=True)
     rate = rospy.Rate(10)
     rospy.Subscriber("/scan", LaserScan, callback)
-    pub = rospy.Publisher('grid_path', numpy_msg(Floats), queue_size=10)
+    rospy.Subscriber("/pf/pose/odom", Odometry, odom_callback)
+    rospy.Subscriber("/next_point", Point, next_point_callback)
+    # pub = rospy.Publisher('grid_path', numpy_msg(Floats), queue_size=10)
     create_radius_array()
-    # print(theta_map)
-    # print(theta_map)
-    # pdb.set_trace()
-    # pdb.set_trace()
-    pub = rospy.Publisher('floats', numpy_msg(Floats), queue_size=10)
+    pub = rospy.Publisher('Grid', OccupancyGrid, queue_size=10)
+    # pub = rospy.Publisher('floats', numpy_msg(Floats), queue_size=10)
     while not rospy.is_shutdown():
-        pub.publish(current_occupancy_grid)
+        pub.publish(occupancy_grid)
         # print("PUBLISHING")
         rate.sleep()
         # pub.publish(current_occupancy_grid)
