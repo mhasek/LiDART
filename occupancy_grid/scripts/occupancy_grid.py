@@ -13,9 +13,9 @@ theta_array = []
 first_scan = True
 counter = 0
 
-OCCUPANCY_GRID_HEIGHT = 7.0 # in meters
-OCCUPANCY_GRID_WIDTH = 7.0 # in meters
-RESOLUTION = 5.0 # boxes per meter
+OCCUPANCY_GRID_HEIGHT = 3.0 # in meters
+OCCUPANCY_GRID_WIDTH = 3.0 # in meters
+RESOLUTION = 40.0 # boxes per meter
 PIXEL_HEIGHT = int(OCCUPANCY_GRID_HEIGHT*RESOLUTION)
 PIXEL_WIDTH = int(OCCUPANCY_GRID_WIDTH*RESOLUTION)
 
@@ -35,9 +35,11 @@ def create_radius_array():
     global theta_map
     for row in range(0, PIXEL_WIDTH):
         for col in range(0, PIXEL_HEIGHT):
-            x_local = row - PIXEL_WIDTH/2
-            radius_map[col, row] = np.sqrt(x_local**2 + col**2)
-            theta_map[col, row] = np.arctan2(col, x_local)
+            theta_map[row, col] = np.arctan2(PIXEL_HEIGHT - (row + 1), col - PIXEL_WIDTH/2)
+            radius_map[row, col] = np.sqrt((col - PIXEL_WIDTH/2)**2 + (PIXEL_HEIGHT - (row + 1))**2)
+            # x_local = row - PIXEL_WIDTH/2
+            # radius_map[col, row] = np.sqrt(x_local**2 + col**2)
+            # theta_map[col, row] = np.arctan2(col, x_local)
 
 
 def callback(data):
@@ -84,24 +86,50 @@ def callback(data):
     # np.set_printoptions(threshold=np.nan)
     # pdb.set_trace()
 
+    pairs = np.array([x_np, y_np]).T
+
+    # Efficiently remove duplicates
+    mult = np.random.rand(pairs.shape[1])
+    ans = pairs.dot(mult)
+    unique, index = np.unique(ans, return_index=True)
+    unique_pairs = pairs[index]
+    # pdb.set_trace()
+
+    # Raytraces obstacles
+    current_radius_map = radius_map
+    current_theta_map = theta_map
+    filtered_scan = filtered_scan[box_constraint]
+    filtered_angles = filtered_angles[box_constraint]
+    # mark behind scans as black
+    for pair in unique_pairs:
+        x_ = pair[0]
+        y_ = pair[1]
+        x_loc = PIXEL_HEIGHT - (y_ + 1)
+        y_loc = x_ - PIXEL_WIDTH/2.0
+        r_loc = np.sqrt((x_loc)**2 + (y_loc)**2)
+        theta = np.arctan2(x_loc, y_loc)
+        raytrace_mask = (current_radius_map > r_loc) & (np.abs(current_theta_map - theta) < np.deg2rad(2.0))
+        # pdb.set_trace()
+        occupancy_from_car[raytrace_mask] = 1.0
+
 
     # w = PIXEL_WIDTH
     # pdb.set_trace()
 
 
-    # Raytraces obstacles
-    # current_radius_map = radius_map
-    # current_theta_map = theta_map
-    # filtered_scan = filtered_scan[box_constraint]
-    # filtered_angles = filtered_angles[box_constraint]
 
     # print(occupancy_from_car)
     # pdb.set_trace()
 
     ## THIS WILL SHOW YOU
     # plt.axis([0, int(OCCUPANCY_GRID_WIDTH*RESOLUTION), 0, int(OCCUPANCY_GRID_HEIGHT*RESOLUTION)])
-    # plt.imshow(occupancy_from_car, cmap='gray_r')
-    # plt.show()
+    if counter % 100 == 0:
+        print("PLOT")
+        plt.gcf().clear()
+        plt.ion()
+        plt.imshow(occupancy_from_car, cmap='gray_r')
+        plt.pause(0.0000001)
+        plt.show()
 
     # Puts coordinates in numpy frame
     # x_prime = y + OCCUPANCY_GRID_WIDTH/2.0
@@ -130,9 +158,9 @@ if __name__ == '__main__':
     # print(theta_map)
     # pdb.set_trace()
     # pdb.set_trace()
-    # pub = rospy.Publisher('floats', numpy_msg(Floats), queue_size=10)
+    pub = rospy.Publisher('floats', numpy_msg(Floats), queue_size=10)
     while not rospy.is_shutdown():
-        # pub.publish(current_occupancy_grid)
+        pub.publish(current_occupancy_grid)
         # print("PUBLISHING")
         rate.sleep()
         # pub.publish(current_occupancy_grid)
