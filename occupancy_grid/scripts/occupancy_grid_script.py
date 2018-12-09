@@ -20,6 +20,7 @@ from rospy.numpy_msg import numpy_msg
 theta_array = []
 first_scan = True
 counter = 0
+out_direction_ = 0
 
 OCCUPANCY_GRID_HEIGHT = 3.0 # in meters
 OCCUPANCY_GRID_WIDTH = 3.0 # in meters
@@ -62,10 +63,12 @@ def callback(data):
     global current_occupancy_grid
     global theta_array
     global first_scan
+    global out_direction_
     get_next_point_client()
     print(next_point_.x)
     occupancy_grid_pub.next_point = next_point_
     occupancy_grid_pub.current_odometry = current_odom
+    occupancy_grid_pub.out_direction = out_direction_
 
     # Only get theta array once
     if first_scan:
@@ -168,11 +171,13 @@ def next_point_callback(data):
 
 def get_next_point_client():
     global next_point_
+    global out_direction_
     rospy.wait_for_service('get_last_waypoint_in_neighborhood')
     get_last_waypoint = rospy.ServiceProxy('get_last_waypoint_in_neighborhood', GetLastBoxPoint)
     try:
         resp1 = get_last_waypoint(current_odom)
         next_point_ = resp1.last_box_waypoint.last_waypoint_in_neighborhood
+        out_direction_ = resp1.last_box_waypoint.out_direction
     except rospy.ServiceException, e:
         print "Service call failed: %s"%e
 
