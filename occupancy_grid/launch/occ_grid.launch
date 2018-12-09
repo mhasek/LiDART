@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<launch>
+
+	<node pkg="occupancy_grid" name="generate_occupancy_grid" type="occupancy_grid_script.py" output="screen" />
+  	<node pkg="occupancy_grid" name="planner_node" type="planner.py" output="screen"/> 
+  	<!-- <node pkg="occupancy_grid" name="local_rrt_node" type="local_rrt.py" output="screen"/>  -->
+
+</launch>

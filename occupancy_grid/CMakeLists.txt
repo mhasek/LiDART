@@ -14,8 +14,6 @@ find_package(catkin REQUIRED COMPONENTS
   nav_msgs
   geometry_msgs
   message_generation
-  rospy_tutorials
-  # numpy_msg
 )
 
 ## System dependencies are found with CMake's conventions
@@ -56,6 +54,7 @@ add_message_files(
    FILES
    OccupancyGrid.msg
    LastBoxWaypoint.msg
+   local_rrt_result.msg
 #   Message2.msg
 )
 
@@ -80,8 +79,6 @@ generate_messages(
    std_msgs
    nav_msgs
    geometry_msgs
-   rospy_tutorials
-   # numpy_msg
 )
 
 ################################################
@@ -116,7 +113,7 @@ generate_messages(
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES occupancy_grid
-#  CATKIN_DEPENDS roscpp rospy std_msgs
+  CATKIN_DEPENDS roscpp rospy std_msgs
 #  DEPENDS system_lib
 )
 

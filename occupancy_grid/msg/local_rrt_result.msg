@@ -1,3 +1,4 @@
 bool follow_local_path
-rospy_tutorials/Floats global_path
-geometry_msgs/Point goal_point
+float32[] global_path_x
+float32[] global_path_y
+geometry_msgs/Point next_point
