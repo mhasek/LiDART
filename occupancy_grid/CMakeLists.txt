@@ -11,7 +11,11 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   std_msgs
+  nav_msgs
+  geometry_msgs
   message_generation
+  rospy_tutorials
+  # numpy_msg
 )
 
 ## System dependencies are found with CMake's conventions
@@ -51,16 +55,17 @@ find_package(catkin REQUIRED COMPONENTS
 add_message_files(
    FILES
    OccupancyGrid.msg
-   local_rrt_result.msg
+   LastBoxWaypoint.msg
 #   Message2.msg
 )
 
 ## Generate services in the 'srv' folder
-# add_service_files(
-#   FILES
-#   Service1.srv
+add_service_files(
+  FILES
+  GetLastBoxPoint.srv
+  GetNextPursuitPoint.srv
 #   Service2.srv
-# )
+)
 
 ## Generate actions in the 'action' folder
 # add_action_files(
@@ -70,10 +75,14 @@ add_message_files(
 # )
 
 ## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#   DEPENDENCIES
-#   std_msgs
-# )
+generate_messages(
+   DEPENDENCIES
+   std_msgs
+   nav_msgs
+   geometry_msgs
+   rospy_tutorials
+   # numpy_msg
+)
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
