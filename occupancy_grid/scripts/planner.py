@@ -11,100 +11,105 @@ from occupancy_grid.srv import *
 from occupancy_grid.msg import LastBoxWaypoint
 from tf.transformations import euler_from_quaternion
 from tf.transformations import quaternion_from_euler
+from nav_msgs.msg import Odometry
+from visualization_msgs.msg import Marker
+
 
 class Planner(object):
   def __init__(self, global_waypoints):
     # global_waypoints are a numpy array of waypoints
     rospy.init_node('planner_node')
+    rospy.Subscriber("/pf/pose/odom", Odometry, self.odom_callback)
     s1 = rospy.Service('get_last_waypoint_in_neighborhood', GetLastBoxPoint, self.getLastWaypointInNeighborhoodService)
     s2 = rospy.Service('get_next_pursuit_point', GetNextPursuitPoint, self.getNextWaypointService)
-    self.global_waypoints = global_waypoints
-    self.next_lap_plus = np.append(global_waypoints, global_waypoints, axis=0)
-    self.next_lap_starts_at = len(global_waypoints)
+# global_waypoints are a numpy array of waypoints
+    self.global_waypoints = np.array(global_waypoints)
+    self.pub_waypoint_marker = rospy.Publisher('next_waypoint_planner', Marker, queue_size="1")
+
+    # print(len(global_waypoints))
+    # print(int(len(global_waypoints) / 2))
+    # print(len(global_waypoints))
+    self.global_first_half = self.global_waypoints[:int(len(global_waypoints) / 2),:]
+    self.global_second_half = self.global_waypoints[int(len(global_waypoints) / 2):,:]
+    
+    # next lap has between half a lap and a whole lap
+    self.next_lap = np.append(self.global_first_half, self.global_second_half, axis=0)
+    self.next_half_starts_at = len(self.global_first_half)
+    self.current_half = 1
+    print("max x of waypoints is ", np.max(self.global_waypoints[:,0]))
+    print("min x of waypoints is ", np.min(self.global_waypoints[:,0]))
+    print("max y of waypoints is ", np.max(self.global_waypoints[:,1]))
+    print("min y of waypoints is ", np.min(self.global_waypoints[:,1]))
     rospy.spin()
+    
+
+
+  def odom_callback(self, data):
+    x = data.pose.pose.position.x
+    # print("odom", x)
+    y = data.pose.pose.position.y
+    self.updateFromOdometry([x, y])
+      
+  def updateFromOdometry(self, current_location):
+    dist = np.linalg.norm(self.next_lap - current_location, axis=1)
+    closest_index = np.argmin(dist)
+    print(closest_index)
+    print("waypoints left in lap ", len(self.next_lap))
+    print("waypoints left in half lap ", self.next_half_starts_at)
+    self.next_lap = self.next_lap[closest_index:, :]
+    self.next_half_starts_at = self.next_half_starts_at - closest_index
+    if (self.next_half_starts_at <= 0):
+      self.next_half_starts_at = len(self.next_lap)
+      if (self.current_half == 1):
+        self.current_half = 2
+        self.next_lap = np.append(self.next_lap, self.global_first_half, axis=0)
+      else:
+        self.current_half = 1
+        self.next_lap = np.append(self.next_lap, self.global_second_half, axis=0)
 
   ## Service, returns next point
   def getNextWaypoint(self, current_location, radius):
-    next_waypoint = Point()
-    for i in range(len(self.next_lap_plus)):
-      if (np.linalg.norm(current_location - self.next_lap_plus[i, :]) >= radius):
+    for i in range(len(self.next_lap)):
+      if (np.linalg.norm(current_location - self.next_lap[i, :]) >= radius):
         if (i == 0):
           raise Exception("First waypoint is too far away from current location")
-
-        # Remove waypoints that have been passed
-        self.next_lap_plus = self.next_lap_plus[i-1:,:]
-
-        # Update the pointer to the start of the next lap
-        self.next_lap_start_at = self.next_lap_starts_at - i + 1
-
-        # If less than a lap remains, add another lap of global waypoints
-        if (self.next_lap_starts_at <= 0):
-          self.next_lap_starts_at = len(self.next_lap_plus)
-          self.next_lap_plus = np.append(self.next_lap_plus, self.global_waypoints, axis=0)
-
-        next_waypoint.x = self.next_lap_plus[0, 0]
-        next_waypoint.y = self.next_lap_plus[0, 1]
-        return next_waypoint
-        # return self.next_lap_plus[0,:]
+          
+        return self.next_lap[0,:]
     raise Exception("All waypoints are too close to current location")
 
   def getLastWaypointInNeighborhood(self, x, y, theta, neighborhood_length):
     last_point = Point()
     last_box_waypoint = LastBoxWaypoint()
-    for i in range(len(self.next_lap_plus)):
-      # vector = self.next_lap_plus[i, :] - np.array([x,y])
-      # transform_mat = np.array([[np.cos(-theta),-np.sin(-theta)],[np.sin(-theta),np.cos(-theta)]])
-      # vector_local = np.matmul(transform_mat, vector.reshape(2,-1))
-      # if (vector_local[1] > neighborhood_length):
-      #   last_box_waypoint.out_direction = 0
-      #   last_point.x = self.next_lap_plus[i - 1, 0]
-      #   last_point.y = self.next_lap_plus[i - 1, 1]
-      #   print(last_point)
-      #   print(last_box_waypoint.out_direction)
-      #   last_box_waypoint.last_waypoint_in_neighborhood = last_point
-      #   return last_box_waypoint
-      # elif (vector_local[0] > neighborhood_length / 2):
-      #   last_box_waypoint.out_direction = 1
-      #   last_point.x = self.next_lap_plus[i - 1, 0]
-      #   last_point.y = self.next_lap_plus[i - 1, 1]
-      #   print(last_point)
-      #   print(last_box_waypoint.out_direction)
-      #   last_box_waypoint.last_waypoint_in_neighborhood = last_point
-      #   return last_box_waypoint
-      # elif (vector_local[0] < - neighborhood_length / 2):
-      #   last_box_waypoint.out_direction = -1
-      #   last_point.x = self.next_lap_plus[i - 1, 0]
-      #   last_point.y = self.next_lap_plus[i - 1, 1]
-      #   print(last_point)
-      #   print(last_box_waypoint.out_direction)
-      #   last_box_waypoint.last_waypoint_in_neighborhood = last_point
-      #   return last_box_waypoint
-
-      dx = self.next_lap_plus[i, 0] - x
-      dy = self.next_lap_plus[i, 1] - y
-
+    for i in range(len(self.next_lap)):
+      # print(self.next_lap)
+      dx = self.next_lap[i, 0] - x
+      dy = self.next_lap[i, 1] - y
+      # print("i:", i)
+      # print("dx", dx)
+      # print("dy", dy)
+      # print("theta", theta)
       if (abs(dx * math.cos(theta) + dy * math.sin(theta)) > neighborhood_length):
         # Exit Forward
         # print("Exit Forward")
         last_box_waypoint.out_direction = 0
-        last_point.x = self.next_lap_plus[i - 1, 0]
-        last_point.y = self.next_lap_plus[i - 1, 1]
+        last_point.x = self.next_lap[i - 1, 0]
+        last_point.y = self.next_lap[i - 1, 1]
         last_box_waypoint.last_waypoint_in_neighborhood = last_point
         return last_box_waypoint
       if (dx * math.sin(theta) - dy * math.cos(theta) > neighborhood_length / 2):
         # Exit Right
         # print("Exit Right")
         last_box_waypoint.out_direction = 1
-        last_point.x = self.next_lap_plus[i - 1, 0]
-        last_point.y = self.next_lap_plus[i - 1, 1]
+        last_point.x = self.next_lap[i - 1, 0]
+        last_point.y = self.next_lap[i - 1, 1]
         last_box_waypoint.last_waypoint_in_neighborhood = last_point
         return last_box_waypoint
       if (-dx * math.sin(theta) + dy * math.cos(theta) > neighborhood_length / 2):
         # Exit Left
         # print("Exit Left")
         last_box_waypoint.out_direction = -1
-        last_point.x = self.next_lap_plus[i - 1, 0]
-        last_point.y = self.next_lap_plus[i - 1, 1]
+        last_point.x = self.next_lap[i - 1, 0]
+        last_point.y = self.next_lap[i - 1, 1]
         last_box_waypoint.last_waypoint_in_neighborhood = last_point
         return last_box_waypoint
 
@@ -112,17 +117,21 @@ class Planner(object):
 
   # this is not used
   def updateWaypoints(self, new_waypoints, last_waypoint):
-    for i in range(len(self.next_lap_plus)):
-      if (np.array_equal(last_waypoint, self.next_lap_plus[i, :])):
-        print(new_waypoints)
-        print(self.next_lap_plus)
-        self.next_lap_plus = np.append(new_waypoints, self.next_lap_plus[i + 1:, :], axis=0)
-
+    for i in range(len(self.next_lap)):
+      if (np.array_equal(last_waypoint, self.next_lap[i, :])):
+        self.next_lap = np.append(new_waypoints, self.next_lap[i + 1:, :], axis=0)
+        
         # If less than a lap remains, add another lap of global waypoints
-        if (self.next_lap_starts_at <= i):
-          self.next_lap_starts_at = len(self.next_lap_plus)
-          self.next_lap_plus = np.append(self.next_lap_plus, global_waypoints, axis=0)
-
+        if (self.next_half_starts_at <= i):
+          if (self.current_half == 1):
+            self.next_half_starts_at = len(self.next_lap)
+            self.next_lap = np.append(self.next_lap, self.global_first_half, axis=0)
+            self.current_lap = 2
+          else:
+            self.next_half_starts_at = len(self.next_lap)
+            self.next_lap = np.append(self.next_lap, self.global_second_half, axis=0)
+            self.current_lap = 1
+          
         return
     raise Exception("That waypoint does not exist")
 
@@ -133,8 +142,29 @@ class Planner(object):
       euler = euler_from_quaternion((req.current_odom.pose.pose.orientation.x, req.current_odom.pose.pose.orientation.y,
                                      req.current_odom.pose.pose.orientation.z, req.current_odom.pose.pose.orientation.w)) # Make a new service
       theta = euler[2]
-      print("odom: ", x, " ", y)
+      # print("neighborhood", x)
+      # print("odom: ", x, " ", y)
       last_waypoint_in_neighborhood = self.getLastWaypointInNeighborhood(x, y, theta, neighborhood_len)
+      pts = last_waypoint_in_neighborhood.last_waypoint_in_neighborhood
+        
+           # next waypoint marker
+      marker = Marker()
+      marker.header.frame_id = "/map"
+      marker.type = marker.SPHERE
+      marker.action = marker.ADD
+      marker.scale.x = 0.2
+      marker.scale.y = 0.2
+      marker.scale.z = 0.2
+      marker.color.a = 1.0
+      marker.color.r = 0.0
+      marker.color.g = 0.0
+      marker.color.b = 1.0
+      marker.pose.orientation.w = 1.0
+      marker.pose.position.x = pts.x
+      marker.pose.position.y = pts.y
+      marker.pose.position.z = 0
+      self.pub_waypoint_marker.publish(marker)
+
       # MAKE A MSG TYPE FOR THIS
       return last_waypoint_in_neighborhood
 
