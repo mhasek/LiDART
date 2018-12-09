@@ -24,8 +24,8 @@ im_center = [1024,1024];
 W2IM = @(p) p.*res + im_center;
 IM2W = @(p) (p - im_center)./res;
 
-offset_x = [1, 0];
-offset_y = [0, 1];
+offset_x = [1.1, 0];
+offset_y = [0, 1.1];
 
 np = [points(1,:) - offset_y;  points(1,:) + offset_x; ...
      points(2,:) + offset_x; points(2,:) + offset_y; ...
@@ -39,7 +39,7 @@ angs = [-pi/2,0; 0,0; 0,pi/2; pi/2,pi/2; pi/2,pi; pi,pi; pi,3*pi/2; 3*pi/2,2*pi]
 idx = repmat(1:4,[2 1]); idx = idx(:);
 fp = [];
 
-rmid = 1;
+rmid = 1.1;
 cnt = 1;
 N = 100;
 dx = 0.05;

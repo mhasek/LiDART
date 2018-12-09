@@ -1,0 +1,44 @@
+im_center = size(im)/2;
+IM2W = @(p) (p*20 - im_center).*[-0.05 0.05];
+
+load('path.mat');
+im = imread("levine.pgm");
+res = [0.05 0.05];
+d = 0.4; % set 40cm buffer zone to wall
+maxIter = 0; % dont optimize for time do exhaustive search
+InterpDist = 0.5; %set path interpolation to 0.5 meters
+
+map = PreProcessMapImage(im,240);
+PrunedPath = PruneWayPoints(map,res,path,d,maxIter);
+LinInterpPath = InterpPath(PrunedPath,InterpDist);
+
+
+yaw = getTheta(LinInterpPath);
+points = LinInterPath;
+t = 0.25*[0 cumsum(vecnorm(diff(points)'))];
+x = points(:,1);
+y = points(:,2);
+
+tq = 0:0.01:t(end);
+slope0 = 0;
+slopeF = 0;
+xq = spline(t,[slope0; x; slopeF],tq);
+yq = spline(t,[slope0; y; slopeF],tq);
+yawq = splite(t,[slope0; yaw; slopeF],tq);
+
+SplinedPath = [xq' yq' yawq'];
+
+[N,M] = size(im);
+imagesc([0 M*res(1)],[0 N*res(2)],im)
+hold on
+plot(path(:,2),path(:,1))
+plot(PrunedPath(:,2),PrunedPath(:,1),'bx')
+plot(LinInterpPath(:,2),LinInterpPath(:,1),'*','MarkerSize',3);
+plot(yq,xq,':.');
+quiver(yq(:,1),path(:,2),cos(theta),sin(theta),0);
+axis('equal');
+hold off
+
+
+
+
