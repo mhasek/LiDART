@@ -62,7 +62,8 @@ def callback(data):
     global current_occupancy_grid
     global theta_array
     global first_scan
-    next_point_ = get_next_point_client()
+    get_next_point_client()
+    print(next_point_.x)
     occupancy_grid_pub.next_point = next_point_
     occupancy_grid_pub.current_odometry = current_odom
 
@@ -166,12 +167,12 @@ def next_point_callback(data):
     next_point_ = data
 
 def get_next_point_client():
+    global next_point_
     rospy.wait_for_service('get_last_waypoint_in_neighborhood')
     get_last_waypoint = rospy.ServiceProxy('get_last_waypoint_in_neighborhood', GetLastBoxPoint)
     try:
         resp1 = get_last_waypoint(current_odom)
-        return resp1
-        next_point_ = resp1.last_box_waypoint
+        next_point_ = resp1.last_box_waypoint.last_waypoint_in_neighborhood
     except rospy.ServiceException, e:
         print "Service call failed: %s"%e
 
