@@ -69,12 +69,18 @@ class Planner(object):
 
   ## Service, returns next point
   def getNextWaypoint(self, current_location, radius):
+    point = Point()
     for i in range(len(self.next_lap)):
-      if (np.linalg.norm(current_location - self.next_lap[i, :]) >= radius):
+      print(radius)
+      if (np.linalg.norm(current_location - self.next_lap[i, :], axis=0) >= radius):
         if (i == 0):
           raise Exception("First waypoint is too far away from current location")
-          
-        return self.next_lap[0,:]
+        
+        point.x = self.next_lap[i-1,0]
+        point.y = self.next_lap[i-1,1]
+
+        # return self.next_lap[0,:]
+        return point
     raise Exception("All waypoints are too close to current location")
 
   def getLastWaypointInNeighborhood(self, x, y, theta, neighborhood_length):
@@ -156,9 +162,9 @@ class Planner(object):
       marker.scale.y = 0.2
       marker.scale.z = 0.2
       marker.color.a = 1.0
-      marker.color.r = 0.0
+      marker.color.r = 1.0
       marker.color.g = 0.0
-      marker.color.b = 1.0
+      marker.color.b = 0.0
       marker.pose.orientation.w = 1.0
       marker.pose.position.x = pts.x
       marker.pose.position.y = pts.y
