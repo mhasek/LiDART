@@ -1,3 +1,3 @@
-rospy_tutorials/Floats occupancy_grid
-geometry_msgs/Point goal_point
-nav_msgs/Odometry current_odom
+int16[] grid_path
+geometry_msgs/Point next_point
+nav_msgs/Odometry current_odometry
