@@ -33,6 +33,8 @@ rows = 0
 columns = 0
 grid_map = np.empty([0,0])
 
+counter = 0 # counter used to plot and debug
+
 # in ROS local coordinate system
 start_point = np.array([0,0])
 
@@ -263,6 +265,7 @@ def callback(data):
   global grid_map
   global rows
   global columns
+  global counter
 
   startTime = datetime.now()
 
@@ -272,7 +275,9 @@ def callback(data):
   grid_map = np.flipud(grid_map)
   rows = len(grid_map)
   columns = len(grid_map[0])
+  print("grid_map received: ", rows, " rows ", columns, " columns")
 
+  counter += 1
 	# plotting the map # DEBUG
   plt.gcf().clear()
   plt.ion()

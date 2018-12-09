@@ -40,7 +40,7 @@ class Planner(object):
         # If less than a lap remains, add another lap of global waypoints
         if (self.next_lap_starts_at <= 0):
           self.next_lap_starts_at = len(self.next_lap_plus)
-          self.next_lap_plus = np.append(self.next_lap_plus, global_waypoints, axis=0)
+          self.next_lap_plus = np.append(self.next_lap_plus, self.global_waypoints, axis=0)
 
         next_waypoint.x = self.next_lap_plus[0, 0]
         next_waypoint.y = self.next_lap_plus[0, 1]
@@ -52,8 +52,37 @@ class Planner(object):
     last_point = Point()
     last_box_waypoint = LastBoxWaypoint()
     for i in range(len(self.next_lap_plus)):
+      # vector = self.next_lap_plus[i, :] - np.array([x,y])
+      # transform_mat = np.array([[np.cos(-theta),-np.sin(-theta)],[np.sin(-theta),np.cos(-theta)]])
+      # vector_local = np.matmul(transform_mat, vector.reshape(2,-1))
+      # if (vector_local[1] > neighborhood_length):
+      #   last_box_waypoint.out_direction = 0
+      #   last_point.x = self.next_lap_plus[i - 1, 0]
+      #   last_point.y = self.next_lap_plus[i - 1, 1]
+      #   print(last_point)
+      #   print(last_box_waypoint.out_direction)
+      #   last_box_waypoint.last_waypoint_in_neighborhood = last_point
+      #   return last_box_waypoint
+      # elif (vector_local[0] > neighborhood_length / 2):
+      #   last_box_waypoint.out_direction = 1
+      #   last_point.x = self.next_lap_plus[i - 1, 0]
+      #   last_point.y = self.next_lap_plus[i - 1, 1]
+      #   print(last_point)
+      #   print(last_box_waypoint.out_direction)
+      #   last_box_waypoint.last_waypoint_in_neighborhood = last_point
+      #   return last_box_waypoint
+      # elif (vector_local[0] < - neighborhood_length / 2):
+      #   last_box_waypoint.out_direction = -1
+      #   last_point.x = self.next_lap_plus[i - 1, 0]
+      #   last_point.y = self.next_lap_plus[i - 1, 1]
+      #   print(last_point)
+      #   print(last_box_waypoint.out_direction)
+      #   last_box_waypoint.last_waypoint_in_neighborhood = last_point
+      #   return last_box_waypoint
+
       dx = self.next_lap_plus[i, 0] - x
       dy = self.next_lap_plus[i, 1] - y
+
       if (abs(dx * math.cos(theta) + dy * math.sin(theta)) > neighborhood_length):
         # Exit Forward
         # print("Exit Forward")
@@ -78,8 +107,10 @@ class Planner(object):
         last_point.y = self.next_lap_plus[i - 1, 1]
         last_box_waypoint.last_waypoint_in_neighborhood = last_point
         return last_box_waypoint
+
     raise Exception("All waypoints are in the neighborhood")
 
+  # this is not used
   def updateWaypoints(self, new_waypoints, last_waypoint):
     for i in range(len(self.next_lap_plus)):
       if (np.array_equal(last_waypoint, self.next_lap_plus[i, :])):
@@ -102,6 +133,7 @@ class Planner(object):
       euler = euler_from_quaternion((req.current_odom.pose.pose.orientation.x, req.current_odom.pose.pose.orientation.y,
                                      req.current_odom.pose.pose.orientation.z, req.current_odom.pose.pose.orientation.w)) # Make a new service
       theta = euler[2]
+      print("odom: ", x, " ", y)
       last_waypoint_in_neighborhood = self.getLastWaypointInNeighborhood(x, y, theta, neighborhood_len)
       # MAKE A MSG TYPE FOR THIS
       return last_waypoint_in_neighborhood
