@@ -9,6 +9,7 @@ import pdb
 import rospy
 from occupancy_grid.srv import *
 from occupancy_grid.msg import LastBoxWaypoint
+from occupancy_grid.msg import local_rrt_result
 from tf.transformations import euler_from_quaternion
 from tf.transformations import quaternion_from_euler
 from nav_msgs.msg import Odometry
@@ -20,6 +21,7 @@ class Planner(object):
     # global_waypoints are a numpy array of waypoints
     rospy.init_node('planner_node')
     rospy.Subscriber("/pf/pose/odom", Odometry, self.odom_callback)
+    rospy.Subscriber("adjust_path", local_rrt_result, self.updateWaypointsCallback)
     s1 = rospy.Service('get_last_waypoint_in_neighborhood', GetLastBoxPoint, self.getLastWaypointInNeighborhoodService)
     s2 = rospy.Service('get_next_pursuit_point', GetNextPursuitPoint, self.getNextWaypointService)
 # global_waypoints are a numpy array of waypoints
@@ -179,6 +181,11 @@ class Planner(object):
       radius = req.radius
       next_way = self.getNextWaypoint(position, radius)
       return next_way
+
+  def updateWaypointsCallback(self, data):
+    last_waypoint = np.array([data.next_point.x, data.next_point.y])
+    new_waypoints = np.array([data.global_path_x, data.global_path_y]).T
+    self.updateWaypoints(new_waypoints, last_waypoint)
 
 def read_csv():
     dirname = os.path.dirname(__file__)
