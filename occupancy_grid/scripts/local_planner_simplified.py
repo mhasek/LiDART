@@ -22,14 +22,15 @@ from occupancy_grid.msg import OccupancyGrid
 from geometry_msgs.msg import Point, Quaternion
 from visualization_msgs.msg import Marker
 
-pub = rospy.Publisher('local_rrt_result', local_rrt_result, queue_size=1)
+# pub = rospy.Publisher('local_rrt_result', local_rrt_result, queue_size=1)
+rst_point_pub = rospy.Publisher('local_planner_next_point', Point, queue_size=1)
 
 scale = 0.125 # one grid equals 0.25m
 buffer = 0.126 # a little more than half width of the car, in meters
 meter_height = 3.0
 meter_width = 3.0
 buffer_grid = math.ceil(buffer / scale)
-step_size = 0.6
+step_size = 0.5
 rows = 0
 columns = 0
 grid_map = np.empty([0,0])
@@ -41,6 +42,10 @@ start_point = np.array([0,0])
 
 # visualization pub of new local paths
 path_pub_ = rospy.Publisher('local_rrt_path_viz', Marker, latch=True, queue_size=10)
+
+MAX_VELOCITY = 5 # m/s
+VELOCITY_BASE = 1
+LOOKAHEAD_DISTANCE = 2
 
 # --- helper functions --- #
 def xy_to_grid(point):
@@ -138,7 +143,7 @@ def isValidEdge(start_point, end_point):
   if not vector[0] == 0:
     slope = vector[1] / vector[0] # slope = dy / dx
   
-  for r in range(start_grid[0], min(columns, end_grid[0] + 1)):
+  for r in range(start_grid[0], end_grid[0] + 1):
     if vector[0] == 0 and vector[1] > 0:
       upper_point = np.array([lower_point[0], 0])
     elif vector[0] == 0 and vector[1] < 0:
@@ -149,10 +154,7 @@ def isValidEdge(start_point, end_point):
     col2 = xy_to_grid(upper_point)[1]
     if (col1 > col2): col1, col2 = col2, col1
     # if (np.sum(grid_map[r,col1:(col2 + 1)]) > 0):
-    upper = min(columns, col2 + buffer_grid + 1)
-    lower = max(0, col1 - buffer_grid)
-    # print("r: ", r)
-    if (np.sum(grid_map[r, lower : upper]) > 0):
+    if (np.sum(grid_map[r,(col1 - buffer_grid):(col2 + buffer_grid + 1)]) > 0):
       #print(start_point,"," , end_point, " is not a valid edge")
       #print("because of row ",r, " and columns: ", col1, " ", col2)
       return False
@@ -160,29 +162,20 @@ def isValidEdge(start_point, end_point):
   return True
     
 def modified_RRT(start_point, end_point, step_size, out_direction):
-
   latest_point = start_point
   path = np.zeros([100,2])
   path[0,:] = start_point
-  prev_cnt = 1
   cnt = 1
   rotations = 0
-  same_point_rotations = 0
-  max_same_point_iterations = 5
   max_iterations = 20
   
-  if out_direction == 0 or out_direction == 2:
-    while(distance(latest_point, end_point) > step_size and rotations <= max_iterations and same_point_rotations <= max_same_point_iterations):
+  if out_direction == 0:
+    while(distance(latest_point, end_point) > step_size and rotations <= max_iterations):
       rotations += 1
-      print("cnt: ", cnt)
-      if (cnt == prev_cnt): 
-        same_point_rotations += 1
+      #print("cnt: ", cnt)
       latest_point = path[cnt - 1, :]
-      print("latest_point: ", latest_point)
-      if (out_direction == 0):
-        random_point = latest_point + np.array([step_size, 0])
-      else:
-        random_point = latest_point + np.array([- step_size, 0])
+      #print("latest_point: ", latest_point)
+      random_point = latest_point + np.array([step_size, 0])
       curr_r = xy_to_grid(random_point)[0]
 
       if (curr_r >= rows):
@@ -198,28 +191,23 @@ def modified_RRT(start_point, end_point, step_size, out_direction):
       #print("min_y: ", min_y, " max_y: ", max_y)
 
       random_point[1] = random.random() * (max_y - min_y) + min_y
-      print("random_point: ", random_point)
+      #print("random_point: ", random_point)
       vector = random_point - latest_point
       #print("vector: ", vector)
       angle = math.atan2(vector[1], vector[0])
       #print("angle: ", angle)
       next_point = latest_point + step_size * np.array([math.cos(angle), math.sin(angle)])
-      next_grid = xy_to_grid(next_point)
       #print("next_point: ", next_point)
 
-      if grid_map[next_grid[0]][next_grid[1]] == 0 and isValidEdge(latest_point, next_point):
+      if isValidEdge(latest_point, next_point):
         #print(next_point)
         path[cnt,:] = next_point
         #print(path[:cnt+1,:])
-        prev_cnt = cnt
-        same_point_rotations = 0
         cnt += 1
   else:
-    while(distance(latest_point, end_point) > step_size and rotations <= max_iterations and same_point_rotations <= max_same_point_iterations):
+    while(distance(latest_point, end_point) > step_size and rotations <= max_iterations):
       rotations += 1
       # print("cnt: ", cnt)
-      if (cnt == prev_cnt): 
-        same_point_rotations += 1
       latest_point = path[cnt - 1, :]
       #print("latest_point: ", latest_point)
       if (out_direction == -1):
@@ -250,47 +238,50 @@ def modified_RRT(start_point, end_point, step_size, out_direction):
       angle = math.atan2(vector[1], vector[0])
       #print("angle: ", angle)
       next_point = latest_point + step_size * np.array([math.cos(angle), math.sin(angle)])
-      next_grid = xy_to_grid(next_point)
       #print("next_point: ", next_point)
 
-      if grid_map[next_grid[0]][next_grid[1]] == 0 and isValidEdge(latest_point, next_point):
+      if isValidEdge(latest_point, next_point):
         #print("adding next point: ", next_point)
         path[cnt,:] = next_point
         #print("after adding this point: ", path[:cnt+1,:])
-        prev_cnt = cnt
-        same_point_rotations = 0
         cnt += 1
   
   if rotations > max_iterations:
-    print("ATTENTION RRT FAILED BC OF EXCEEDING MAX ITERATION")
-    #displayMapAndPath(path[:cnt+1,:], grid_map)
-    if cnt > 10:
-      path[cnt,:] = end_point
-      return path[:cnt + 1,:]
-    else:
-      return np.zeros([0,2])
-  elif same_point_rotations > max_same_point_iterations:
-    print("ATTENTION RRT FAILED BC OF EXCEEDING MAX SAME PT ITERATION: ", same_point_rotations)
-    #displayMapAndPath(path[:cnt+1,:], grid_map)
-    if cnt > 10:
-      path[cnt,:] = end_point
-      return path[:cnt + 1,:]
-    else:
-      return np.zeros([0,2])
+    return np.zeros([0,2])
   else:
-    print("ATTENTION RETURNING RRT!")
-    print("cnt: ", cnt)
     print("before adding end point: ", path[:cnt,:])
-    print(end_point)
     path[cnt,:] = end_point
-    print(path[:cnt+1,:])
     return path[:cnt + 1,:]
+
+def modified_next_point(lookahead_distance, out_direction):
+  if out_direction == 0:
+    random_point = np.array([step_size, 0])
+    curr_r = xy_to_grid(random_point)[0]
+    col_range = find_max_driveable_col_range(curr_r)
+    if (col_range[1] - col_range[0] < 0):
+      print("no valid grid to sample from!") # TODO: go backwards until you find one row
+      
+    min_y = grid_to_xy(np.array([curr_r, col_range[1]]))[1] - scale * 0.5
+    max_y = grid_to_xy(np.array([curr_r, col_range[0]]))[1] + scale * 0.5
+    mid_y = (min_y + max_y)/2
+
+    return np.array([lookahead_distance,mid_y])
+  else:
+    random_point = np.array([0, step_size])
+    curr_c = xy_to_grid(random_point)[1]
+    row_range = find_max_driveable_row_range(curr_c)
+    if (row_range[1] - row_range[0] < 0):
+      print("no valid grid to sample from!") # TODO: go backwards until you find one row
+    
+    min_x = grid_to_xy(np.array([row_range[0], curr_c]))[0] - scale * 0.5
+    max_x = grid_to_xy(np.array([row_range[1], curr_c]))[0] + scale * 0.5
+    mid_x = (min_x + max_x)/2
+
+    return np.array([mid_x, lookahead_distance])
 
 def displayMapAndPath(path, grid_map):
   freeSpaceboxes = []
   fig = mpl.pyplot.figure()
-  #plt.gcf().clear()
-  #plt.ion()
   ax = fig.add_subplot(1, 1, 1)
 
   for r in range(rows):
@@ -311,11 +302,29 @@ def displayMapAndPath(path, grid_map):
   ax.add_collection(edgeCollection)
   ax.autoscale()
   ax.margins(0.1)
-  plt.show()
+  mpl.pyplot.show()
   # mpl.pyplot.savefig('map ' + str(counter) + '.png')
 
 def within_bound(pixel):
   return pixel[0] >= 0 and pixel[0] < rows and pixel[1] >= 0 and pixel[1] < columns
+
+def publish_new_path(global_path):
+  marker = Marker(type=Marker.LINE_LIST, action=Marker.ADD)
+  marker.header.stamp = stamp if stamp is not None else rospy.Time.now()
+  marker.scale.x = 0.05
+  marker.scale.y = 0.05
+  marker.color.b = 1.0
+  marker.color.a = 1.0
+  marker.pose.position = Point(0,0,0)
+  marker.pose.orientation = Quaternion(0,0,0,1)
+  
+  marker.points = []
+  for j in (range(len(global_path)) - 1): 
+      marker.points.extend([Point(global_path[j,0], global_path[j,1], 0), 
+                            Point(global_path[j+1,0], global_path[j+1,1], 0)])
+                       
+  marker.lifetime = rospy.Time(5) # 5 sec
+  path_pub_.publish(marker)
 
 # --- The callback function --- #
 def callback(data):
@@ -348,9 +357,7 @@ def callback(data):
   #   plt.pause(0.0000001)
   #   plt.show()
 
-  result_msg = local_rrt_result()
-
-  result_msg.next_point = data.next_point
+  # result_msg = local_rrt_result()
 
 	# get yaw
   euler = euler_from_quaternion((data.current_odometry.pose.pose.orientation.x, 
@@ -364,10 +371,9 @@ def callback(data):
   curr_location_point = np.array([0.0,0.0]).astype(float)
   curr_location_point[0] = data.current_odometry.pose.pose.position.x
   curr_location_point[1] = data.current_odometry.pose.pose.position.y
-  vector = (global_end_point - curr_location_point).reshape(2,-1)
+  vector = (global_end_point - curr_location_point)
   transform_mat = np.array([[np.cos(yaw),np.sin(yaw)],[-np.sin(yaw),np.cos(yaw)]])
-  end_point = np.matmul(transform_mat,vector).reshape(2)
-  print("end point: ", end_point)
+  end_point = np.matmul(transform_mat,vector)
 
   # pdb.set_trace()
   # detect whether you need to follow local path
@@ -377,7 +383,6 @@ def callback(data):
   follow_local_path = False
   out_direction = data.out_direction
   
-  original_end_point = end_point
   # check: if end point is behind start point, use pure pursuit
   if distance(start_point, end_point) <= step_size: # this puts upper limit on step_size. 
     follow_local_path = False
@@ -433,92 +438,88 @@ def callback(data):
         if isValidEdge(start_point, end_point):
           follow_local_path = False
       
-
   if (follow_local_path):
     print("Follow local path")
-    local_path = np.empty([0,2])
-    # if we are going forward and end point has very small exit, plot from end point
-    # otherwise, just plot it from start to end
-    if (out_direction == 0):
-      end_col_range = find_max_driveable_col_range(ep_grid[0])
-      if (end_col_range[1] - end_col_range[0] <= 3):
-        print("calling local RRT reversely with local end_point: ", end_point, " local_start_point: ", start_point)
-        local_path = modified_RRT(end_point, start_point, step_size, 2)
-        local_path = np.flipud(local_path)
-      else:
-        print("calling local RRT with local start_point: ", start_point, " local_end_point: ", end_point)
-        local_path = modified_RRT(start_point, end_point, step_size, out_direction)
-    else:
-      print("calling local RRT with local start_point: ", start_point, " local_end_point: ", end_point)
-      local_path = modified_RRT(start_point, end_point, step_size, out_direction)
+    print("lookahead_distance: ", LOOKAHEAD_DISTANCE)
+    next_point_local = modified_next_point(LOOKAHEAD_DISTANCE * 1.5, out_direction)
+    print("next_point_local: ", next_point_local)
+    print("curr_location_point: ", curr_location_point)
+
+    transform_mat = np.array([[np.cos(yaw),-np.sin(yaw)],[np.sin(yaw),np.cos(yaw)]])
+    next_point_global = np.matmul(transform_mat, next_point_local.reshape(2,-1)) + curr_location_point.reshape(2,-1)
+    print("next_point_global: ", next_point_global)
+
+    rst_point = Point()
+    rst_point.x = next_point_global[0,0]
+    rst_point.y = next_point_global[1,0]
+    rst_point_pub.publish(rst_point)
+
+    # local_path = np.empty([0,2])
+    # local_path = modified_RRT(start_point, end_point, step_size, out_direction)
     
     # if len(local_path) == 0:
-    #   print("calling local RRT reversely with local end_point: ", end_point, " local_start_point: ", start_point)
-    #   out_direction = 2 # rear
     #   local_path = modified_RRT(end_point, start_point, step_size, out_direction)
-    #   local_path = np.flipud(local_path)
-    #   print("after flipping: ")
-    #   print(local_path)
+
+    # if len(local_path) > 0:
+    #   # transform local path to global path
+    #   transform_mat = np.array([[np.cos(-yaw),-np.sin(-yaw)],[np.sin(-yaw),np.cos(-yaw)]])
+    #   global_path = np.matmul(transform_mat, np.transpose(local_path)) - curr_location_point.reshape(2,-1)
+    #   global_path = global_path.transpose()
+    #   endTime = datetime.now()
+    #   print(endTime - startTime)
+
+    #   # publish adjusted global path
+    #   result_msg.follow_local_path = True
+    #   result_msg.global_path_x = global_path[:,0].tolist()
+    #   result_msg.global_path_y = global_path[:,1].tolist()
+    #   pub.publish(result_msg)
+    #   publish_new_path(global_path)
+
+    #   # print out info for debug
+    #   path_len = len(global_path)
+    #   print ("ATTENTION!USING LOCAL PATH!!!")
+    #   print("out direction: ", out_direction)
+    #   print("counter: ", counter)
+    #   print("start point: ", curr_location_point)
+    #   print("global end point: ", global_end_point)
+    #   print("curr location point: ", curr_location_point)
+    #   print("original end point: ", global_end_point - curr_location_point)
+    #   print("adjusted end point: ", end_point)
+    #   print("local_path: ", local_path)
+    #   print("path len: ", path_len)
+    #   # print("PLOTTING---")
+    #   # displayMapAndPath(local_path, grid_map)
       
-
-    if len(local_path) > 2:
-      # transform local path to global path
-      transform_mat = np.array([[np.cos(yaw),-np.sin(yaw)],[np.sin(yaw),np.cos(yaw)]])
-      global_path = np.matmul(transform_mat, np.transpose(local_path)) + curr_location_point.reshape(2,-1)
-      global_path = global_path.transpose()
-
-      # publish adjusted global path
-      result_msg.follow_local_path = True
-      result_msg.global_path_x = global_path[:,0].tolist()
-      result_msg.global_path_y = global_path[:,1].tolist()
-      pub.publish(result_msg)
-      print("plotting in rviz!")
-      counter += 1
-      # publish_new_path(global_path)
-      endTime = datetime.now()
-      print("RRT success time: ")
-      print(endTime - startTime)
-
-      # print out info for debug
-      path_len = len(global_path)
-      print ("ATTENTION!USING LOCAL PATH!!!")
-      print("out direction: ", out_direction)
-      print("counter: ", counter)
-      print("start point: ", curr_location_point)
-      print("global end point: ", global_end_point)
-      print("curr location point: ", curr_location_point)
-      print("original end point: ", original_end_point)
-      print("adjusted end point: ", end_point)
-      print("local_path: ", local_path)
-      print("global_path: ", global_path)
-      print("path len: ", path_len)
-      print("PLOTTING---")
-      displayMapAndPath(local_path, grid_map)
-      
-    else:
-      endTime = datetime.now()
-      print("RRT failure time: ")
-      print(endTime - startTime)
-      print("can't find local RRT path. use pure pursuit")
-      print ("ATTENTION!FAILED USING LOCAL PATH!!!")
-      print("out direction: ", out_direction)
-      print("counter: ", counter)
-      print("start point: ", curr_location_point)
-      print("global end point: ", global_end_point)
-      print("curr location point: ", curr_location_point)
-      print("original end point: ", original_end_point)
-      print("adjusted end point: ", end_point)
-      result_msg.follow_local_path = False
+    # else:
+    #   endTime = datetime.now()
+    #   print(endTime - startTime)
+    #   print("can't find local RRT path. use pure pursuit")
+    #   print ("ATTENTION!FAILED USING LOCAL PATH!!!")
+    #   print("out direction: ", out_direction)
+    #   print("counter: ", counter)
+    #   print("start point: ", curr_location_point)
+    #   print("global end point: ", global_end_point)
+    #   print("curr location point: ", curr_location_point)
+    #   print("original end point: ", global_end_point - curr_location_point)
+    #   print("adjusted end point: ", end_point)
+    #   result_msg.follow_local_path = False
 
   else:
-    result_msg.follow_local_path = False
+    # result_msg.follow_local_path = False
     print("use pure pursuit")
 
   # timing
   # time_difference_in_ms = (endTime - startTime) / timedelta(milliseconds=1)
 
+def drive_param_callback(data):
+  global LOOKAHEAD_DISTANCE
+  velocity = data.velocity
+  LOOKAHEAD_DISTANCE = np.abs(velocity - VELOCITY_BASE)*1.5/MAX_VELOCITY + 0.8
+  # print(velocity)
+
 if __name__ == '__main__':
-  rospy.init_node('local_rrt_node')
+  rospy.init_node('local_planner_simplified')
   # TODO: change to the topic and message published by occupancy grid
   rospy.Subscriber('/grid', OccupancyGrid, callback, queue_size=1) 
+  rospy.Subscriber('/drive_parameters', drive_param, drive_param_callback, queue_size=1)
   rospy.spin()

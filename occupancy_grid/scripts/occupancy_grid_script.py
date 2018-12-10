@@ -67,7 +67,7 @@ def callback(data):
     global first_scan
     global out_direction_
     get_next_point_client()
-    print(next_point_)
+    # print(next_point_)
     occupancy_grid_pub.next_point = next_point_
     occupancy_grid_pub.current_odometry = current_odom
     occupancy_grid_pub.out_direction = out_direction_

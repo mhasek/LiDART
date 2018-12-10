@@ -55,6 +55,7 @@ add_message_files(
    OccupancyGrid.msg
    LastBoxWaypoint.msg
    local_rrt_result.msg
+   all_waypoints.msg
 #   Message2.msg
 )
 
@@ -205,3 +206,7 @@ include_directories(
 
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
+
+add_executable(local_path_visualizer src/local_path_visualizer.cpp)
+target_link_libraries(local_path_visualizer ${catkin_LIBRARIES})
+add_dependencies(local_path_visualizer occupancy_grid_generate_messages_cpp)
