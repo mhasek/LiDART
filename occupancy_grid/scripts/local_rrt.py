@@ -174,11 +174,11 @@ def modified_RRT(start_point, end_point, step_size, out_direction):
   if out_direction == 0 or out_direction == 2:
     while(distance(latest_point, end_point) > step_size and rotations <= max_iterations and same_point_rotations <= max_same_point_iterations):
       rotations += 1
-      print("cnt: ", cnt)
+      #print("cnt: ", cnt)
       if (cnt == prev_cnt): 
         same_point_rotations += 1
       latest_point = path[cnt - 1, :]
-      print("latest_point: ", latest_point)
+      #print("latest_point: ", latest_point)
       if (out_direction == 0):
         random_point = latest_point + np.array([step_size, 0])
       else:
@@ -186,7 +186,7 @@ def modified_RRT(start_point, end_point, step_size, out_direction):
       curr_r = xy_to_grid(random_point)[0]
 
       if (curr_r >= rows):
-        print("curr_r > rows: ", curr_r)
+        #print("curr_r > rows: ", curr_r)
         break
         
       col_range = find_max_driveable_col_range(curr_r)
@@ -198,7 +198,7 @@ def modified_RRT(start_point, end_point, step_size, out_direction):
       #print("min_y: ", min_y, " max_y: ", max_y)
 
       random_point[1] = random.random() * (max_y - min_y) + min_y
-      print("random_point: ", random_point)
+      #print("random_point: ", random_point)
       vector = random_point - latest_point
       #print("vector: ", vector)
       angle = math.atan2(vector[1], vector[0])
@@ -230,7 +230,7 @@ def modified_RRT(start_point, end_point, step_size, out_direction):
       curr_c = xy_to_grid(random_point)[1]
 
       if (curr_c >= columns):
-        print("curr_c > columns: ", curr_c)
+        #print("curr_c > columns: ", curr_c)
         break
 
       row_range = find_max_driveable_row_range(curr_c)
@@ -262,7 +262,7 @@ def modified_RRT(start_point, end_point, step_size, out_direction):
         cnt += 1
   
   if rotations > max_iterations:
-    print("ATTENTION RRT FAILED BC OF EXCEEDING MAX ITERATION")
+    #print("ATTENTION RRT FAILED BC OF EXCEEDING MAX ITERATION")
     #displayMapAndPath(path[:cnt+1,:], grid_map)
     if cnt > 10:
       path[cnt,:] = end_point
@@ -270,7 +270,7 @@ def modified_RRT(start_point, end_point, step_size, out_direction):
     else:
       return np.zeros([0,2])
   elif same_point_rotations > max_same_point_iterations:
-    print("ATTENTION RRT FAILED BC OF EXCEEDING MAX SAME PT ITERATION: ", same_point_rotations)
+    #print("ATTENTION RRT FAILED BC OF EXCEEDING MAX SAME PT ITERATION: ", same_point_rotations)
     #displayMapAndPath(path[:cnt+1,:], grid_map)
     if cnt > 10:
       path[cnt,:] = end_point
@@ -278,12 +278,12 @@ def modified_RRT(start_point, end_point, step_size, out_direction):
     else:
       return np.zeros([0,2])
   else:
-    print("ATTENTION RETURNING RRT!")
-    print("cnt: ", cnt)
-    print("before adding end point: ", path[:cnt,:])
-    print(end_point)
+    #print("ATTENTION RETURNING RRT!")
+    #print("cnt: ", cnt)
+    #print("before adding end point: ", path[:cnt,:])
+    #print(end_point)
     path[cnt,:] = end_point
-    print(path[:cnt+1,:])
+    #print(path[:cnt+1,:])
     return path[:cnt + 1,:]
 
 def displayMapAndPath(path, grid_map):
@@ -324,20 +324,20 @@ def callback(data):
   global columns
   global counter
 
-  print(counter)
+  #print(counter)
 
   startTime = datetime.now()
 
 	# get the map and related info
   # this should be a np array
   if (len(data.grid_path) == 0):
-    print("empty grid map received")
+    #print("empty grid map received")
     return
   grid_map = np.asarray(data.grid_path).reshape(meter_height / scale, meter_height / scale)  
   grid_map = np.flipud(grid_map)
   rows = len(grid_map)
   columns = len(grid_map[0])
-  print("grid_map received: ", rows, " rows ", columns, " columns")
+  #print("grid_map received: ", rows, " rows ", columns, " columns")
 
   
 	# plotting the map # DEBUG
@@ -367,7 +367,7 @@ def callback(data):
   vector = (global_end_point - curr_location_point).reshape(2,-1)
   transform_mat = np.array([[np.cos(yaw),np.sin(yaw)],[-np.sin(yaw),np.cos(yaw)]])
   end_point = np.matmul(transform_mat,vector).reshape(2)
-  print("end point: ", end_point)
+  #print("end point: ", end_point)
 
   # pdb.set_trace()
   # detect whether you need to follow local path
@@ -435,21 +435,21 @@ def callback(data):
       
 
   if (follow_local_path):
-    print("Follow local path")
+    #print("Follow local path")
     local_path = np.empty([0,2])
     # if we are going forward and end point has very small exit, plot from end point
     # otherwise, just plot it from start to end
     if (out_direction == 0):
       end_col_range = find_max_driveable_col_range(ep_grid[0])
       if (end_col_range[1] - end_col_range[0] <= 3):
-        print("calling local RRT reversely with local end_point: ", end_point, " local_start_point: ", start_point)
+        #print("calling local RRT reversely with local end_point: ", end_point, " local_start_point: ", start_point)
         local_path = modified_RRT(end_point, start_point, step_size, 2)
         local_path = np.flipud(local_path)
       else:
-        print("calling local RRT with local start_point: ", start_point, " local_end_point: ", end_point)
+        #print("calling local RRT with local start_point: ", start_point, " local_end_point: ", end_point)
         local_path = modified_RRT(start_point, end_point, step_size, out_direction)
     else:
-      print("calling local RRT with local start_point: ", start_point, " local_end_point: ", end_point)
+      #print("calling local RRT with local start_point: ", start_point, " local_end_point: ", end_point)
       local_path = modified_RRT(start_point, end_point, step_size, out_direction)
     
     # if len(local_path) == 0:
@@ -472,47 +472,47 @@ def callback(data):
       result_msg.global_path_x = global_path[:,0].tolist()
       result_msg.global_path_y = global_path[:,1].tolist()
       pub.publish(result_msg)
-      print("plotting in rviz!")
+      #print("plotting in rviz!")
       counter += 1
       # publish_new_path(global_path)
       endTime = datetime.now()
-      print("RRT success time: ")
-      print(endTime - startTime)
+#      print("RRT success time: ")
+#      print(endTime - startTime)
 
       # print out info for debug
       path_len = len(global_path)
-      print ("ATTENTION!USING LOCAL PATH!!!")
-      print("out direction: ", out_direction)
-      print("counter: ", counter)
-      print("start point: ", curr_location_point)
-      print("global end point: ", global_end_point)
-      print("curr location point: ", curr_location_point)
-      print("original end point: ", original_end_point)
-      print("adjusted end point: ", end_point)
-      print("local_path: ", local_path)
-      print("global_path: ", global_path)
-      print("path len: ", path_len)
-      print("PLOTTING---")
-      displayMapAndPath(local_path, grid_map)
+#      print ("ATTENTION!USING LOCAL PATH!!!")
+#      print("out direction: ", out_direction)
+#      print("counter: ", counter)
+ #     print("start point: ", curr_location_point)
+#      print("global end point: ", global_end_point)
+#      print("curr location point: ", curr_location_point)
+#      print("original end point: ", original_end_point)
+#      print("adjusted end point: ", end_point)
+#      print("local_path: ", local_path)
+#      print("global_path: ", global_path)
+#      print("path len: ", path_len)
+#      print("PLOTTING---")
+      # displayMapAndPath(local_path, grid_map)
       
     else:
       endTime = datetime.now()
-      print("RRT failure time: ")
-      print(endTime - startTime)
-      print("can't find local RRT path. use pure pursuit")
-      print ("ATTENTION!FAILED USING LOCAL PATH!!!")
-      print("out direction: ", out_direction)
-      print("counter: ", counter)
-      print("start point: ", curr_location_point)
-      print("global end point: ", global_end_point)
-      print("curr location point: ", curr_location_point)
-      print("original end point: ", original_end_point)
-      print("adjusted end point: ", end_point)
+ #     print("RRT failure time: ")
+ #     print(endTime - startTime)
+ #     print("can't find local RRT path. use pure pursuit")
+ #     print ("ATTENTION!FAILED USING LOCAL PATH!!!")
+  #    print("out direction: ", out_direction)
+ #     print("counter: ", counter)
+ #     print("start point: ", curr_location_point)
+ #     print("global end point: ", global_end_point)
+ #     print("curr location point: ", curr_location_point)
+  #    print("original end point: ", original_end_point)
+ #     print("adjusted end point: ", end_point)
       result_msg.follow_local_path = False
 
   else:
     result_msg.follow_local_path = False
-    print("use pure pursuit")
+ #   print("use pure pursuit")
 
   # timing
   # time_difference_in_ms = (endTime - startTime) / timedelta(milliseconds=1)

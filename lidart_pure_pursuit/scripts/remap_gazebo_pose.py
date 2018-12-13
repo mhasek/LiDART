@@ -30,12 +30,8 @@ def robot_pose_update(data):
     if len(names) < 2:
         return
 
-    # pdb.set_trace()
-    try:
-        racecar_index = names.index("racecar")
-        racecar_pose = data.pose[racecar_index]
-    except:
-        return
+    racecar_index = names.index("racecar")
+    racecar_pose = data.pose[racecar_index]
 
 if __name__ == "__main__":
     rospy.init_node("remap_gazebo_pose")

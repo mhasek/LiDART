@@ -22,15 +22,16 @@ from nav_msgs.msg import Odometry
 # CONSTANTS #
 #############
 
-LOOKAHEAD_DISTANCE = 2 # meters
-MAX_VELOCITY = 5 # m/s
+LOOKAHEAD_DISTANCE = 2.0 # meters, does nothing
+MAX_VELOCITY = 3.0 # m/s
 L = 0.325 # meters
 FAR_DISTANCE_L_COEFF = 1.5
 FAR_DISTANCE_V_COEFF = 0.2
-DIFF_ANGLE_V_COEFF = 2.0
-CURR_ANGLE_V_COEFF = 2.0
-VELOCITY_BASE = 1
+DIFF_ANGLE_V_COEFF = 0.5 #0.5
+CURR_ANGLE_V_COEFF = 0.5 #0.5
+VELOCITY_BASE = 1.5 #1
 VELOCITY = 1.0
+MIN_LOOKAHEAD_DISTANCE = 0.5
 
 ###########
 # GLOBALS #
@@ -41,11 +42,12 @@ current_odom = Odometry()
 # Import waypoints.csv into a list (path_points)
 # path_points: (x,y,theta)
 dirname = os.path.dirname(__file__)
-filename = os.path.join(dirname, '../waypoints/test.csv')
+filename = os.path.join(dirname, '../waypoints/wide.csv')
+#filename = os.path.join(dirname, '../waypoints/gen_waypts.csv')
 with open(filename) as f:
     path_points = [tuple(line) for line in csv.reader(f)]
 
-# Turn path_points into a list of floats to eliminate the need for casts in the code below.
+# Turn path_points into a list of floats to eliminate the ned for casts in the code below.
 path_points = [[float(point[0]), float(point[1]), float(point[2])] for point in path_points]
 # change path_points into np array to simply processing
 path_points = np.array(path_points)[:,:2]
@@ -88,8 +90,9 @@ def closest_node(node, nodes):
 
 def velocity(angle, far_ahead_angle):
     velocity = VELOCITY_BASE
-    velocity += (1-abs(angle/np.deg2rad(18)))*CURR_ANGLE_V_COEFF
-    velocity += (1-abs((angle-far_ahead_angle)/np.deg2rad(18)))*DIFF_ANGLE_V_COEFF
+    velocity += max((1-abs(angle/np.deg2rad(18)))*CURR_ANGLE_V_COEFF,0)
+    velocity += max((1-abs((angle-far_ahead_angle)/np.deg2rad(18)))*DIFF_ANGLE_V_COEFF,0)
+    #print(velocity)
     return min(velocity, MAX_VELOCITY)
 
 def odom_callback(data):
@@ -221,10 +224,23 @@ def callback(data):
     
     angle = np.clip(angle, -0.4189, 0.4189) # 0.4189 radians = 24 degrees because car can only turn 24 degrees max
     # print(angle)
+    vel = velocity(angle, far_ahead_angle)
     msg = drive_param()
-    msg.velocity = velocity(angle, far_ahead_angle)/5
-    LOOKAHEAD_DISTANCE = np.abs(msg.velocity - VELOCITY_BASE)*1.5/MAX_VELOCITY + 0.8
-    print(LOOKAHEAD_DISTANCE)
+    msg.velocity = vel
+    # LOOKAHEAD_DISTANCE = 1.5*np.abs(msg.velocity)/(MAX_VELOCITY) + MIN_LOOKAHEAD_DISTANCE
+    vel_th1 = 1.5
+    vel_th2 = 2.5
+    LA_min = 0.7
+    LA_max = 1.7
+    if vel > vel_th2:
+        LOOKAHEAD_DISTANCE = LA_max
+    elif vel < vel_th1:
+	LOOKAHEAD_DISTANCE = LA_min
+    else:
+	LOOKAHEAD_DISTANCE = LA_min + (LA_max-LA_min)*(vel-vel_th1)/(vel_th2-vel_th1) 
+	
+    print("LOOKAHEAD: ",LOOKAHEAD_DISTANCE)
+    print("vel:",vel)
     # msg.velocity = VELOCITY
     msg.angle = angle
     pub.publish(msg)
@@ -233,5 +249,4 @@ if __name__ == '__main__':
     rospy.init_node('pure_pursuit')
     rospy.Subscriber("/pf/pose/odom", Odometry, odom_callback)
     rospy.Subscriber('/pf/viz/inferred_pose', PoseStamped, callback, queue_size=1)
-    rospy.spin()
-
+rospy.spin()

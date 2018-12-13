@@ -3,7 +3,7 @@
 	<include file="$(find racecar)/launch/teleop.launch"/>
   	
   	<!-- Run map server -->
-	<arg name="map_file" default="$(find lidart_pure_pursuit)/maps/levine_map4.yaml"/>
+	<arg name="map_file" default="$(find lidart_pure_pursuit)/maps/nikhil_processed.yaml"/>
 	<node name="map_server" pkg="map_server" type="map_server" args="$(arg map_file)" />
 
   	<node pkg="tf2_ros" type="static_transform_publisher" name="base_footprint_to_laser" args="0 0 0 0 0 0 			base_footprint laser" output="screen"/>
@@ -77,9 +77,9 @@
 		<param name="rangelib_variant" value="2"/>
 	</node>
 
-    	<node pkg="lidart_pure_pursuit" name="visualize_markers_node" type="visualize_markers.py" output="screen"/>
+    	<!--node pkg="lidart_pure_pursuit" name="visualize_markers_node" type="visualize_markers.py" output="screen"/-->
 	<node pkg="lidart_wall_following" name="dead_mans_switch" type="dead_mans_switch.py" output="screen"/>
-	<node pkg="lidart_pure_pursuit" name="pure_pursuit" type="pure_pursuit.py" output="screen"/>
-
+	<!--node pkg="lidart_pure_pursuit" name="pure_pursuit" type="pure_pursuit.py" output="screen"/>
+	<node pkg="lidart_pure_pursuit" name="pure_pursuit" type="pure_pursuit_cautious.py" output="screen"/-->
 
 </launch>

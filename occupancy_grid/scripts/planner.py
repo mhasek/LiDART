@@ -201,16 +201,19 @@ class Planner(object):
       return next_way
 
   def updateWaypointsCallback(self, data):
+    if not (data.follow_local_path):
+      print("Not updating")
+      return
     last_waypoint = np.array([data.next_point.x, data.next_point.y])
     new_waypoints = np.array([data.global_path_x, data.global_path_y]).T
-    print("planner updating waypoints!")
+    print("\n\n\n\n\nplanner updating waypoints!\n\n\n\n\n")
     print(new_waypoints)
     print(last_waypoint)
     self.updateWaypoints(new_waypoints, last_waypoint)
 
 def read_csv():
     dirname = os.path.dirname(__file__)
-    filename = os.path.join(dirname, '../waypoints/gen_waypts.csv')
+    filename = os.path.join(dirname, '../waypoints/wide.csv')
     with open(filename) as f:
         path_points = [tuple(line) for line in csv.reader(f)]
 

@@ -24,7 +24,7 @@ import copy
 import pylab as pl
 
 PUB = rospy.Publisher('local_rrt_result', local_rrt_result, queue_size=1)
-BUFFER = 0.1 # a little more than half width of the car, in meters
+BUFFER = 0.3 # a little more than half width of the car, in meters
 NEIGHBORHOOD_LENGTH = 3.0
 NUM_BOXES = 24
 STEP_SIZE = 0.5
@@ -432,7 +432,8 @@ class LocalMap(object):
   
   
   def isValidEdge(self, point1, point2, print_statements=False):
-    #print("let's check for valid edge")
+    if (print_statements):
+      print("LETS CHECK ", point1, point2)
     global NUM_BOXES
     pixel1 = self.toHW(point1[0], point1[1])
     pixel2 = self.toHW(point2[0], point2[1])
@@ -443,6 +444,7 @@ class LocalMap(object):
     if (print_statements):
       print("dh", dh)
       print("dw", dw)
+      print(self.local_grid)
 
     if (dh + dw == 0):
       return not self.local_grid[pixel1[0], pixel1[1]]
@@ -455,8 +457,8 @@ class LocalMap(object):
         m = (dw * 1.0) / dh
         #print("Slope is ", m)
         for h in range(int(pixel1[0]), int(pixel2[0])):
-          w_low = min(math.floor((h - pixel1[0]) * m + pixel1[1]), NUM_BOXES-1)
-          w_high = min(math.ceil((h - pixel1[0]) * m + pixel1[1]), NUM_BOXES-1)
+          w_low = int(min(math.floor((h - pixel1[0]) * m + pixel1[1]), NUM_BOXES-1))
+          w_high = int(min(math.ceil((h - pixel1[0]) * m + pixel1[1]), NUM_BOXES-1))
           if (self.local_grid[h, w_low]):
             if (print_statements):
               print("acan't drive at ", h, w_low)
@@ -469,8 +471,8 @@ class LocalMap(object):
         # increment from point 2 to point 1
         m = - (dw * 1.0) / dh
         for h in range(int(pixel2[0]), int(pixel1[0])):
-          w_low = min(math.floor((h - pixel2[0]) * m + pixel2[1]), NUM_BOXES-1)
-          w_high = min(math.ceil((h - pixel2[0]) * m + pixel2[1]), NUM_BOXES-1)
+          w_low = int(min(math.floor((h - pixel2[0]) * m + pixel2[1]), NUM_BOXES-1))
+          w_high = int(min(math.ceil((h - pixel2[0]) * m + pixel2[1]), NUM_BOXES-1))
           if (self.local_grid[h, w_low]):
             if (print_statements):
               print("ccan't drive at ", h, w_low)
@@ -486,8 +488,8 @@ class LocalMap(object):
         # increment from point 1 to point 2
         m = dh / (dw * 1.0) 
         for w in range(int(pixel1[1]), int(pixel2[1])):
-          h_low = min(math.floor((w - pixel1[1]) * m + pixel1[0]), NUM_BOXES-1)
-          h_high = min(math.ceil((w - pixel1[1]) * m + pixel1[0]), NUM_BOXES-1)
+          h_low = int(min(math.floor((w - pixel1[1]) * m + pixel1[0]), NUM_BOXES-1))
+          h_high = int(min(math.ceil((w - pixel1[1]) * m + pixel1[0]), NUM_BOXES-1))
           if (self.local_grid[h_low, w]):
             if (print_statements):
               print("ecan't drive at ", h_low, w)
@@ -500,8 +502,8 @@ class LocalMap(object):
         # increment from point 2 to point 1
         m = - dh / (dw * 1.0) 
         for w in range(int(pixel2[1]), int(pixel1[1])):
-          h_low = min(math.floor((w - pixel2[1]) * m + pixel2[0]), NUM_BOXES-1)
-          h_high = min(math.ceil((w - pixel2[1]) * m + pixel2[0]), NUM_BOXES-1)
+          h_low = int(min(math.floor((w - pixel2[1]) * m + pixel2[0]), NUM_BOXES-1))
+          h_high = int(min(math.ceil((w - pixel2[1]) * m + pixel2[0]), NUM_BOXES-1))
           if (self.local_grid[h_low, w]):
             if (print_statements):
               print("gcan't drive at ", h_low, w)
@@ -510,7 +512,8 @@ class LocalMap(object):
             if (print_statements):
               print("hcan't drive at ", h_high, w)
             return False
-    
+    if (print_statements):
+      print("CAN DRIVE ", point1, point2)
     return True
 
 
@@ -673,9 +676,10 @@ def callback(data):
   yaw = euler[2] 
   #print("let's make the local rrt")
   localRRT = LocalRRT(buffered_map.astype(int), K, [x, y], yaw, [data.next_point.x, data.next_point.y])
+  localRRT_no_buffer = LocalRRT(grid_map.astype(int), K, [x, y], yaw, [data.next_point.x, data.next_point.y])
   #print("do we need to run local rrt?")
-  if not (localRRT.local_map.isValidEdge([x, y], [data.next_point.x, data.next_point.y], print_statements=False)):
-    #print("let's run the local rrt")
+  if not (localRRT_no_buffer.local_map.isValidEdge([x, y], [data.next_point.x, data.next_point.y], print_statements=True)):
+    print("let's run the local rrt")
     local_path = localRRT.runRRT(STEP_SIZE, 100).reshape((-1, 2))
     
     while (len(local_path) < 2):
@@ -701,6 +705,12 @@ def callback(data):
     #print(local_path)
 
     PUB.publish(result_msg)
+    return
+  else:
+    result_msg = local_rrt_result()
+    result_msg.follow_local_path = False
+    PUB.publish(result_msg)
+    print("No need to update")
   
 
 if __name__ == '__main__':

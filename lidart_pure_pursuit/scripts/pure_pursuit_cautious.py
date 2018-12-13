@@ -3,6 +3,7 @@
 import rospy
 from race.msg import drive_param
 from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import Point
 import math
 import numpy as np
 from numpy import linalg as LA
@@ -10,40 +11,43 @@ import tf.transformations
 from tf.transformations import euler_from_quaternion
 from tf.transformations import quaternion_from_euler
 from visualization_msgs.msg import Marker
+from occupancy_grid.srv import *
 import csv
 import os
 import sys
 import pdb
-from geometry_msgs.msg import Point
 from nav_msgs.msg import Odometry
-from occupancy_grid.srv import *
 
 #############
 # CONSTANTS #
 #############
 
-LOOKAHEAD_DISTANCE = 0.5 # meters
-MAX_VELOCITY = 2 # m/s
+LOOKAHEAD_DISTANCE = 2.0 # meters, does nothing
+MAX_VELOCITY = 1.0 # m/s
 L = 0.325 # meters
 FAR_DISTANCE_L_COEFF = 1.5
 FAR_DISTANCE_V_COEFF = 0.2
 DIFF_ANGLE_V_COEFF = 1.0
 CURR_ANGLE_V_COEFF = 1.0
-VELOCITY_BASE = 1.0
+VELOCITY_BASE = 0.5
 VELOCITY = 1.0
+MIN_LOOKAHEAD_DISTANCE = 0.5
 
 ###########
 # GLOBALS #
 ###########
 
+current_odom = Odometry()
+
 # Import waypoints.csv into a list (path_points)
 # path_points: (x,y,theta)
 dirname = os.path.dirname(__file__)
-filename = os.path.join(dirname, '../waypoints/test.csv')
+filename = os.path.join(dirname, '../waypoints/wide.csv')
+#filename = os.path.join(dirname, '../waypoints/gen_waypts.csv')
 with open(filename) as f:
     path_points = [tuple(line) for line in csv.reader(f)]
 
-# Turn path_points into a list of floats to eliminate the need for casts in the code below.
+# Turn path_points into a list of floats to eliminate the ned for casts in the code below.
 path_points = [[float(point[0]), float(point[1]), float(point[2])] for point in path_points]
 # change path_points into np array to simply processing
 path_points = np.array(path_points)[:,:2]
@@ -55,13 +59,21 @@ pub_waypoint_marker = rospy.Publisher('next_waypoint_viz', Marker, queue_size="1
 pub_pf_marker = rospy.Publisher('pf_point_viz', Marker, queue_size="1")
 pub_far_ahead_waypoint_marker = rospy.Publisher('far_ahead_point_viz', Marker, queue_size="1")
 
-pf_point = np.array([0, 0])
-current_odom = Odometry()
-next_point_ = Point()
-
 #############
 # FUNCTIONS #
 #############
+
+## give odometry and inner rad and outer rad
+def get_next_point_client(odom, distance):
+    rospy.wait_for_service('get_next_pursuit_point')
+    get_next_waypoint = rospy.ServiceProxy('get_next_pursuit_point', GetNextPursuitPoint)
+    try:
+        resp1 = get_next_waypoint(odom, distance)
+        next_point_ = resp1.pursuit_point
+        return np.array([next_point_.x,next_point_.y])
+
+    except rospy.ServiceException, e:
+        print "Service call failed: %s"%e
     
 # Computes the Euclidean distance between two 2D points p1 and p2.
 def dist(p1, p2):
@@ -78,24 +90,17 @@ def closest_node(node, nodes):
 
 def velocity(angle, far_ahead_angle):
     velocity = VELOCITY_BASE
-    velocity += (1-abs(angle/np.deg2rad(30)))*CURR_ANGLE_V_COEFF
-    velocity += (1-abs((angle-far_ahead_angle)/np.deg2rad(30)))*DIFF_ANGLE_V_COEFF
+    velocity += max((1-abs(angle/np.deg2rad(18)))*CURR_ANGLE_V_COEFF,0)
+    velocity += max((1-abs((angle-far_ahead_angle)/np.deg2rad(18)))*DIFF_ANGLE_V_COEFF,0)
+    #print(velocity)
     return min(velocity, MAX_VELOCITY)
 
-def get_next_point_client():
-    global next_point_
-    rospy.wait_for_service('get_next_pursuit_point')
-    get_next_waypoint = rospy.ServiceProxy('get_next_pursuit_point', GetNextPursuitPoint)
-    try:
-        resp1 = get_next_waypoint(current_odom, LOOKAHEAD_DISTANCE)
-        print(resp1)
-        next_point_ = resp1.pursuit_point
-    except rospy.ServiceException, e:
-        print "Service call failed: %s"%e
+def odom_callback(data):
+    global current_odom
+    current_odom = data
 
 def callback(data):
-    global pf_point
-    get_next_point_client()
+    global LOOKAHEAD_DISTANCE
 
     # Note: These following numbered steps below are taken from R. Craig Coulter's paper on pure pursuit.
 
@@ -110,27 +115,42 @@ def callback(data):
     # print(pf_point)
 
     # 2. Find the path point closest to the vehicle that is >= 1 lookahead distance from vehicle's current location.
-    next_waypoint = closest_node(pf_point, path_points)
-    distance = dist(pf_point, path_points[next_waypoint])
+    # next_waypoint = closest_node(pf_point, path_points)
+    # distance = dist(pf_point, path_points[next_waypoint])
     # for i in range(closest_point_to_pf, len(path_points)):
-    while distance < LOOKAHEAD_DISTANCE :
-        next_waypoint = (next_waypoint + 1) % len(path_points)
-        distance = dist(pf_point, path_points[next_waypoint])
 
-    far_ahead_waypoint = next_waypoint
-    far_distance = dist(pf_point, path_points[far_ahead_waypoint])
-    while far_distance < LOOKAHEAD_DISTANCE * (FAR_DISTANCE_L_COEFF - 1) + distance + FAR_DISTANCE_V_COEFF * MAX_VELOCITY :
-        far_ahead_waypoint = (far_ahead_waypoint + 1) % len(path_points)
-        far_distance = dist(pf_point, path_points[far_ahead_waypoint])
+    odom = current_odom
+    close_LOOKAHEAD_DISTANCE = LOOKAHEAD_DISTANCE
+    close_point = get_next_point_client(odom, close_LOOKAHEAD_DISTANCE)
+    distance = dist(pf_point, close_point)
+
+
+    far_LOOKAHEAD_DISTANCE = LOOKAHEAD_DISTANCE * (FAR_DISTANCE_L_COEFF - 1) + distance + FAR_DISTANCE_V_COEFF * MAX_VELOCITY
+    far_point = get_next_point_client(odom, far_LOOKAHEAD_DISTANCE)
+    far_distance = dist(pf_point, far_point)
+
+    # print(far_LOOKAHEAD_DISTANCE)
+
+    # while distance < LOOKAHEAD_DISTANCE :
+    #     next_waypoint = (next_waypoint + 1) % len(path_points)
+    #     distance = dist(pf_point, path_points[next_waypoint])
+
+    # far_ahead_waypoint = next_waypoint
+    # far_distance = dist(pf_point, path_points[far_ahead_waypoint])
+    # while far_distance < LOOKAHEAD_DISTANCE * (FAR_DISTANCE_L_COEFF - 1) + distance + FAR_DISTANCE_V_COEFF * MAX_VELOCITY :
+    #     far_ahead_waypoint = (far_ahead_waypoint + 1) % len(path_points)
+    #     far_distance = dist(pf_point, path_points[far_ahead_waypoint])
 
 
     # 3. Transform the goal point to vehicle coordinates. 
-    waypoint_value = path_points[next_waypoint,:]
+    # waypoint_value = path_points[next_waypoint,:]
+    waypoint_value = close_point
     transform_vector = waypoint_value - pf_point
     transform_mat = np.array([[np.cos(yaw),np.sin(yaw)],[-np.sin(yaw),np.cos(yaw)]])
     transform_vector_local = np.matmul(transform_mat,transform_vector)
 
-    far_ahead_waypoint_value = path_points[far_ahead_waypoint,:]
+    far_ahead_waypoint_value = far_point
+    # far_ahead_waypoint_value = path_points[far_ahead_waypoint,:]
     far_ahead_transform_vector = far_ahead_waypoint_value - pf_point
     far_ahead_transform_vector_local = np.matmul(transform_mat,far_ahead_transform_vector)
 
@@ -141,9 +161,10 @@ def callback(data):
     far_ahead_curvature = 2*far_ahead_transform_vector_local[1]/far_distance**2
     angle = np.arctan2(curvature * L, 1)
     far_ahead_angle = np.arctan2(far_ahead_curvature * L, 1)
-    print(path_points[next_waypoint])
-    print(distance)
-    print(next_waypoint)
+    # print(path_points[next_waypoint])
+    print waypoint_value
+    # print(distance)
+    # print(next_waypoint)
 
     # next waypoint marker
     marker = Marker()
@@ -202,20 +223,30 @@ def callback(data):
     # pdb.set_trace()
     
     angle = np.clip(angle, -0.4189, 0.4189) # 0.4189 radians = 24 degrees because car can only turn 24 degrees max
-    print(angle)
+    # print(angle)
+    vel = velocity(angle, far_ahead_angle)
     msg = drive_param()
-    # msg.velocity = velocity(angle, far_ahead_angle)
-    msg.velocity = VELOCITY
+    msg.velocity = vel
+    # LOOKAHEAD_DISTANCE = 1.5*np.abs(msg.velocity)/(MAX_VELOCITY) + MIN_LOOKAHEAD_DISTANCE
+    vel_th1 = 1.5
+    vel_th2 = 2.5
+    LA_min = 0.3
+    LA_max = 0.3
+    if vel > vel_th2:
+        LOOKAHEAD_DISTANCE = LA_max
+    elif vel < vel_th1:
+	LOOKAHEAD_DISTANCE = LA_min
+    else:
+	LOOKAHEAD_DISTANCE = LA_min + (LA_max-LA_min)*(vel-vel_th1)/(vel_th2-vel_th1) 
+	
+    print("LOOKAHEAD: ",LOOKAHEAD_DISTANCE)
+    print("vel:",vel)
+    # msg.velocity = VELOCITY
     msg.angle = angle
     pub.publish(msg)
-
-def odom_callback(data):
-    global current_odom
-    current_odom = data
     
 if __name__ == '__main__':
-    rospy.init_node('pure_pursuit_race')
-    rospy.Subscriber('/pf/viz/inferred_pose', PoseStamped, callback, queue_size=1)
+    rospy.init_node('pure_pursuit')
     rospy.Subscriber("/pf/pose/odom", Odometry, odom_callback)
-    rospy.spin()
-
+    rospy.Subscriber('/pf/viz/inferred_pose', PoseStamped, callback, queue_size=1)
+rospy.spin()
