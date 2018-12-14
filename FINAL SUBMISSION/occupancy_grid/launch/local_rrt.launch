@@ -1,7 +1,0 @@
-<?xml version="1.0"?>
-<launch>
-
-	<node pkg="occupancy_grid" name="local_rrt_node" type="local_rrt.py" output="screen"/>
-
-
-</launch>
