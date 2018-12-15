@@ -40,10 +40,6 @@ class Planner(object):
     self.next_lap = np.append(self.global_first_half, self.global_second_half, axis=0)
     self.next_half_starts_at = len(self.global_first_half)
     self.current_half = 1
-    print("max x of waypoints is ", np.max(self.global_waypoints[:,0]))
-    print("min x of waypoints is ", np.min(self.global_waypoints[:,0]))
-    print("max y of waypoints is ", np.max(self.global_waypoints[:,1]))
-    print("min y of waypoints is ", np.min(self.global_waypoints[:,1]))
     rospy.spin()
     
   def odom_callback(self, data):
@@ -53,8 +49,6 @@ class Planner(object):
     self.updateFromOdometry([x, y])
       
   def updateFromOdometry(self, current_location):
-    print("WAYPOINTS COMING UP")
-    print("CURRENT LOCATION ", current_location)
     dist = np.linalg.norm(self.next_lap - current_location, axis=1)
     closest_index = np.argmin(dist)
     #print(closest_index)
@@ -81,8 +75,6 @@ class Planner(object):
   def getNextWaypoint(self, current_location, radius):
     # print("getting next waypoint!")
     point = Point()
-    print("GETTING A WAYPOINT")
-    print("THE FIRST WAYPOINT IS ", self.next_lap[0, :])
     for i in range(len(self.next_lap)):
       #print(radius)
       if (np.linalg.norm(current_location - self.next_lap[i, :], axis=0) >= radius):
@@ -97,8 +89,6 @@ class Planner(object):
 
         # return self.next_lap[0,:]
         return point
-    print(self.next_lap)
-    print("current location: ", current_location)
     raise Exception("All waypoints are too close to current location")
 
   def getLastWaypointInNeighborhood(self, x, y, theta, neighborhood_length):
@@ -143,7 +133,6 @@ class Planner(object):
   def updateWaypoints(self, new_waypoints, last_waypoint):
     for i in range(len(self.next_lap)):
       if (np.linalg.norm(last_waypoint - self.next_lap[i, :]) < 0.01):
-        print("updating way point")
         self.next_lap = np.append(new_waypoints, self.next_lap[i + 1:, :], axis=0)
         
         # If less than a lap remains, add another lap of global waypoints
@@ -157,7 +146,6 @@ class Planner(object):
             self.next_lap = np.append(self.next_lap, self.global_second_half, axis=0)
             self.current_lap = 1
         
-        print("remaining waypoints count: ", len(self.next_lap))
         return
     raise Exception("That waypoint does not exist")
 
@@ -202,13 +190,9 @@ class Planner(object):
 
   def updateWaypointsCallback(self, data):
     if not (data.follow_local_path):
-      print("Not updating")
       return
     last_waypoint = np.array([data.next_point.x, data.next_point.y])
     new_waypoints = np.array([data.global_path_x, data.global_path_y]).T
-    print("\n\n\n\n\nplanner updating waypoints!\n\n\n\n\n")
-    print(new_waypoints)
-    print(last_waypoint)
     self.updateWaypoints(new_waypoints, last_waypoint)
 
 def read_csv():

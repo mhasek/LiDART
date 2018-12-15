@@ -335,16 +335,16 @@ def callback(data):
   localRRT = LocalRRT(buffered_map.astype(int), K, [x, y], yaw, [data.next_point.x, data.next_point.y])
   localRRT_no_buffer = LocalRRT(grid_map.astype(int), K, [x, y], yaw, [data.next_point.x, data.next_point.y])
   #print("do we need to run local rrt?")
-  if not (localRRT_no_buffer.local_map.isValidEdge([x, y], [data.next_point.x, data.next_point.y], print_statements=True)):
-    print("let's run the local rrt")
+  if not (localRRT_no_buffer.local_map.isValidEdge([x, y], [data.next_point.x, data.next_point.y], print_statements=False)):
+    # print("let's run the local rrt")
     local_path = localRRT.runRRT(STEP_SIZE, 100).reshape((-1, 2))
     
     while (len(local_path) < 2):
-      print("THIS PATH IS TOO SHORT")
+      # print("THIS PATH IS TOO SHORT")
       break
       boxes_to_buffer = boxes_to_buffer - 1
       if (boxes_to_buffer < 0):
-        print("COULD NOT FIND A PATH")
+        # print("COULD NOT FIND A PATH")
         break
       buffered_map = bufferizeManhattan(grid_map, boxes_to_buffer)
       localRRT = LocalRRT(buffered_map.astype(int), K, [x, y], yaw, [data.next_point.x, data.next_point.y])

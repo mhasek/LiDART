@@ -79,7 +79,7 @@
 
     	<!--node pkg="lidart_pure_pursuit" name="visualize_markers_node" type="visualize_markers.py" output="screen"/-->
 	<node pkg="lidart_wall_following" name="dead_mans_switch" type="dead_mans_switch.py" output="screen"/>
-	<!--node pkg="lidart_pure_pursuit" name="pure_pursuit" type="pure_pursuit.py" output="screen"/>
-	<node pkg="lidart_pure_pursuit" name="pure_pursuit" type="pure_pursuit_cautious.py" output="screen"/-->
+	<node pkg="lidart_pure_pursuit" name="pure_pursuit" type="pure_pursuit.py" output="screen"/>
+	<!--node pkg="lidart_pure_pursuit" name="pure_pursuit" type="pure_pursuit_cautious.py" output="screen"/-->
 
 </launch>
