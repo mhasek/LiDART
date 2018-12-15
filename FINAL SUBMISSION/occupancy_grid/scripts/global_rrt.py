@@ -560,25 +560,29 @@ def TransformPoints(path,im_center):
 
 # -- MAIN SCRIPT --
 if __name__ == '__main__':
-  # # load map
-  # map = Map(filePath, buffer, scale, step_size)
+  # load map
+  map = Map(filePath, buffer, scale, step_size)
 
-  # # TODO: get the wall points from matplotlib UI
-  # # must be vertical
-  # startPoint = np.array([270, 155]) * scale
-  # startWall1 = [240 * scale, 155 * scale]
-  # startWall2 = [300 * scale, 155 * scale]
+  # TODO: get the wall points from matplotlib UI
+  # must be vertical
+  startPoint = np.array([270, 155]) * scale
+  startWall1 = [240 * scale, 155 * scale]
+  startWall2 = [300 * scale, 155 * scale]
 
-  # map.resetMap(step_size)
-  # map.createStartLine(startWall1, startWall2)
-  # tree = RRT(startPoint, map, step_size)
-  # rrt_path = np.vstack([tree.getPathFromLastVertex(), startPoint])
-  # print(rrt_path)
-  # # map.displayMapAndPath(rrt_path)
-  # plt.close("all")
+  # startPoint = np.array([51, 51])
+  # startWall1 = [47, 51]
+  # startWall2 = [55, 51]
+
+  map.resetMap(step_size)
+  map.createStartLine(startWall1, startWall2)
+  tree = RRT(startPoint, map, step_size)
+  rrt_path = np.vstack([tree.getPathFromLastVertex(), startPoint])
+  print(rrt_path)
+  # map.displayMapAndPath(rrt_path)
+  plt.close("all")
 
 
-  # np.savetxt("rrt_path.csv", rrt_path,delimiter = ",")
+  np.savetxt("rrt_path.csv", rrt_path,delimiter = ",")
 
   rrt_path  = np.genfromtxt('rrt_path.csv',delimiter=',')
 
