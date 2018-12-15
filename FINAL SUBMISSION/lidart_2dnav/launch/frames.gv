@@ -1,0 +1,19 @@
+digraph G {
+"base_link" -> "chassis"[label="Broadcaster: /robot_state_publisher\nAverage rate: 10000.000 Hz\nMost recent transform: 0.000 ( 173.114 sec old)\nBuffer length: 0.000 sec\n"];
+"map" -> "base_link"[label="Broadcaster: /gazebo_odometry_node\nAverage rate: 20.208 Hz\nMost recent transform: 173.096 ( 0.018 sec old)\nBuffer length: 4.800 sec\n"];
+"chassis" -> "chassis_inertia"[label="Broadcaster: /robot_state_publisher\nAverage rate: 10000.000 Hz\nMost recent transform: 0.000 ( 173.114 sec old)\nBuffer length: 0.000 sec\n"];
+"chassis" -> "laser"[label="Broadcaster: /robot_state_publisher\nAverage rate: 10000.000 Hz\nMost recent transform: 0.000 ( 173.114 sec old)\nBuffer length: 0.000 sec\n"];
+"chassis" -> "zed_camera_link"[label="Broadcaster: /robot_state_publisher\nAverage rate: 10000.000 Hz\nMost recent transform: 0.000 ( 173.114 sec old)\nBuffer length: 0.000 sec\n"];
+"zed_camera_link" -> "camera_link"[label="Broadcaster: /robot_state_publisher\nAverage rate: 10000.000 Hz\nMost recent transform: 0.000 ( 173.114 sec old)\nBuffer length: 0.000 sec\n"];
+"zed_camera_link" -> "zed_camera_right_link"[label="Broadcaster: /robot_state_publisher\nAverage rate: 10000.000 Hz\nMost recent transform: 0.000 ( 173.114 sec old)\nBuffer length: 0.000 sec\n"];
+"left_steering_hinge" -> "left_front_wheel"[label="Broadcaster: /robot_state_publisher\nAverage rate: 50.209 Hz\nMost recent transform: 173.081 ( 0.033 sec old)\nBuffer length: 4.780 sec\n"];
+"chassis" -> "left_steering_hinge"[label="Broadcaster: /robot_state_publisher\nAverage rate: 50.209 Hz\nMost recent transform: 173.081 ( 0.033 sec old)\nBuffer length: 4.780 sec\n"];
+"chassis" -> "left_rear_wheel"[label="Broadcaster: /robot_state_publisher\nAverage rate: 50.209 Hz\nMost recent transform: 173.081 ( 0.033 sec old)\nBuffer length: 4.780 sec\n"];
+"right_steering_hinge" -> "right_front_wheel"[label="Broadcaster: /robot_state_publisher\nAverage rate: 50.209 Hz\nMost recent transform: 173.081 ( 0.033 sec old)\nBuffer length: 4.780 sec\n"];
+"chassis" -> "right_steering_hinge"[label="Broadcaster: /robot_state_publisher\nAverage rate: 50.209 Hz\nMost recent transform: 173.081 ( 0.033 sec old)\nBuffer length: 4.780 sec\n"];
+"chassis" -> "right_rear_wheel"[label="Broadcaster: /robot_state_publisher\nAverage rate: 50.209 Hz\nMost recent transform: 173.081 ( 0.033 sec old)\nBuffer length: 4.780 sec\n"];
+edge [style=invis];
+ subgraph cluster_legend { style=bold; color=black; label ="view_frames Result";
+"Recorded at time: 173.114"[ shape=plaintext ] ;
+ }->"map";
+}

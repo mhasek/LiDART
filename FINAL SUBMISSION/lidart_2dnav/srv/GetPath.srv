@@ -1,0 +1,4 @@
+geometry_msgs/PoseStamped start_point
+int64 num_of_laps
+---
+lidart_2dnav/Path path

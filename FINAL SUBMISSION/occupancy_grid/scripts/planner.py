@@ -213,7 +213,7 @@ class Planner(object):
 
 def read_csv():
     dirname = os.path.dirname(__file__)
-    filename = os.path.join(dirname, '../waypoints/wide.csv')
+    filename = os.path.join(dirname, '../waypoints/race_pts.csv')
     with open(filename) as f:
         path_points = [tuple(line) for line in csv.reader(f)]
 

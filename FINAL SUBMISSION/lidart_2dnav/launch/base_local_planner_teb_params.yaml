@@ -1,0 +1,48 @@
+TrajectoryPlannerROS:
+  # max_vel_x: 1.00
+  # min_vel_x: -1.00
+  # max_vel_theta: 0.8
+  # min_vel_theta: -0.8
+  # min_in_place_vel_theta: 0.4
+
+  # acc_lim_theta: 0.2
+  # acc_lim_x: 2.0
+  # acc_lim_y: 0
+
+  # sim time: 4.0 #Tuning guide
+  # vx_samples: 20
+  # vy_samples: 0
+  # vth_samples: 40
+
+  yaw_goal_tolerance: 3.14 # So angle doesn't matter
+  xy_goal_tolerance: 2.00
+
+  # heading_scoring: true # doesn't work
+  # dwa: false
+  # vx_samples: 10
+  # gdist_scale: 5.0
+  # pdist_scale: 0.0
+  holonomic_robot: false
+
+TebLocalPlannerROS:
+  odom_topic: /pf/pose/odom
+  map_frame: /map
+  acc_lim_x: 2.5
+  acc_lim_theta: 1.00
+  wheelbase: 0.325
+  max_vel_x: 2.00
+  max_vel_x_backwards: 1.00
+  max_vel_theta: 2.00
+  cmd_angle_instead_rotvel: true
+  free_goal_vel: true
+  min_turning_radius: 0.70
+  yaw_goal_tolerance: 3.14 # So angle doesn't matter
+  xy_goal_tolerance:  0.20
+  min_obstacle_dist: 0.11
+  free_goal_vel: true
+  max_global_plan_lookahead_dist: 2.00
+  no_inner_iterations: 1.0
+  no_outer_iterations: 2.0
+  costmap_obstacles_behind_robot_dist: 0.0 #
+  obstacle_poses_affected: 10
+  dt_ref: 0.20

@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<launch>  
+  <include file="$(find lidart_2dnav)/launch/lidart_configuration_real.launch"/> 
+  <include file="$(find lidart_2dnav)/launch/move_base.launch"/> 
+</launch>
+

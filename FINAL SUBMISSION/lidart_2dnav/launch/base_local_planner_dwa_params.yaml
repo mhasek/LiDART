@@ -1,0 +1,31 @@
+TrajectoryPlannerROS:
+  yaw_goal_tolerance: 3.14 # So angle doesn't matter
+  xy_goal_tolerance: 0.10
+  min_in_place_vel_theta: 0.0
+  dwa: false
+  max_vel_x: 2.00
+  min_vel_x: 0.00
+  max_vel_theta: 1.0
+  min_vel_theta: -1.0
+
+  acc_lim_theta: 1.0
+  acc_lim_x: 2.0
+  acc_lim_y: 0
+
+  sim_time: 1.0 #Tuning guide
+  vx_samples: 20
+  vy_samples: 0
+  vtheta_samples: 40
+
+  yaw_goal_tolerance: 3.14
+  xy_goal_tolerance: 0.10
+  # forward_point_distance: 0.00 # From online source
+  # heading_scoring: true # doesn't work
+  # dwa: false
+  # vx_samples: 10
+  # gdist_scale: 5.0
+  # pdist_scale: 0.0
+  holonomic_robot: false
+  global_frame_id: map
+
+

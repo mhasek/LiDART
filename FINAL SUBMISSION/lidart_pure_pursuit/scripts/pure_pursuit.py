@@ -42,8 +42,7 @@ current_odom = Odometry()
 # Import waypoints.csv into a list (path_points)
 # path_points: (x,y,theta)
 dirname = os.path.dirname(__file__)
-filename = os.path.join(dirname, 'waypoints/wide.csv')
-#filename = os.path.join(dirname, '../waypoints/gen_waypts.csv')
+filename = os.path.join(dirname, 'waypoints/race_pts.csv')
 with open(filename) as f:
     path_points = [tuple(line) for line in csv.reader(f)]
 
