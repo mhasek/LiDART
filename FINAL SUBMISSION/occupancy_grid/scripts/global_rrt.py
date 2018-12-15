@@ -21,7 +21,8 @@ from scipy import interpolate
 
 
 # filepath of .pgm file
-filePath = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..', 'maps/race-map.pgm'))
+filePath = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '..', 'maps/racemap.pgm'))
+name = "race_pts"
 
 # -- GLOBAL VARIABLES --
 step_size = 0.1
@@ -398,7 +399,7 @@ def RRT(startPoint, map, step_size):
     if (isValidEdge(nearestPoint, nextPoint, map)):
       tree.addPointToTree(nextPoint, nearestTriple[2])
       lastNewPoint = nextPoint
-      #print(nextPoint)
+      print(nextPoint)
     #else:
       #print(nearestPoint, " ", nextPoint, " is not a valid edge")
     #if (i % 400 == 0):
@@ -550,34 +551,51 @@ def PruneWayPoints(filePath,res,path,d):
   return sparsePath
 
 
+def TransformPoints(path,im_center):
+  fp = np.hstack((path[:,1].reshape(-1,1),path[:,0].reshape(-1,1))) + im_center 
+  fp = np.hstack((-fp[:,0].reshape(-1,1), fp[:,1].reshape(-1,1)))
+  return fp
+
+
+
 # -- MAIN SCRIPT --
 if __name__ == '__main__':
-  # load map
-  map = Map(filePath, buffer, scale, step_size)
+  # # load map
+  # map = Map(filePath, buffer, scale, step_size)
 
-  # TODO: get the wall points from matplotlib UI
-  # must be vertical
-  startPoint = np.array([270, 155]) * scale
-  startWall1 = [240 * scale, 155 * scale]
-  startWall2 = [300 * scale, 155 * scale]
+  # # TODO: get the wall points from matplotlib UI
+  # # must be vertical
+  # startPoint = np.array([270, 155]) * scale
+  # startWall1 = [240 * scale, 155 * scale]
+  # startWall2 = [300 * scale, 155 * scale]
 
-  map.resetMap(step_size)
-  map.createStartLine(startWall1, startWall2)
-  tree = RRT(startPoint, map, step_size)
-  rrt_path = np.vstack([tree.getPathFromLastVertex(), startPoint])
-  print(rrt_path)
-  # map.displayMapAndPath(path)
+  # map.resetMap(step_size)
+  # map.createStartLine(startWall1, startWall2)
+  # tree = RRT(startPoint, map, step_size)
+  # rrt_path = np.vstack([tree.getPathFromLastVertex(), startPoint])
+  # print(rrt_path)
+  # # map.displayMapAndPath(rrt_path)
+  # plt.close("all")
+
+
+  # np.savetxt("rrt_path.csv", rrt_path,delimiter = ",")
+
+  rrt_path  = np.genfromtxt('rrt_path.csv',delimiter=',')
 
   #prune waypoint -- this part is not working yet --
   res = np.array([0.05,0.05])
   d = 0.6
   sparsePath = PruneWayPoints(filePath, res, rrt_path, d)
 
+  sparsePath[0,:] = sparsePath[-1,:]
+
   tck,u = interpolate.splprep(sparsePath.T,k=1,s=0)
   unew = np.arange(0, 1.01, 0.01)
   out = interpolate.splev(unew, tck)
 
   sparsePath = PruneWayPoints(filePath, res, np.hstack((out[0].reshape(-1,1),out[1].reshape(-1,1))), 0.4)
+
+  sparsePath[0,:] = sparsePath[-1,:]
 
   sparsePath = pathInterp(sparsePath,0.3)
 
@@ -587,4 +605,20 @@ if __name__ == '__main__':
 
   path = np.hstack((out[0].reshape(-1,1),out[1].reshape(-1,1)))
 
+  im_center = np.array([[-7.969707,-4.438220]]);
+  out_path = TransformPoints(path, im_center)
+
+
+  rootPath = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '../../'))
+
+  np.savetxt(os.path.abspath(os.path.join(rootPath, "lidart_pure_pursuit/scripts/waypoints/" + name +".csv")), out_path,delimiter = ",")
+  np.savetxt(os.path.abspath(os.path.join(rootPath,"occupancy_grid/waypoints/" + name + ".csv")), out_path,delimiter = ",")
+
   print(path)
+
+  plt.figure()
+  plt.imshow(map.image)
+  plt.hold(True)
+  plt.plot(path[:,1]*20,path[:,0]*20)
+  plt.plot(rrt_path[:,1]*20,rrt_path[:,0]*20)
+  plt.show()
