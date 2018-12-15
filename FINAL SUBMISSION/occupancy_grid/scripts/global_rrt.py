@@ -553,7 +553,7 @@ def PruneWayPoints(filePath,res,path,d):
 
 def TransformPoints(path,im_center):
   fp = np.hstack((path[:,1].reshape(-1,1),path[:,0].reshape(-1,1))) + im_center 
-  fp = np.hstack((-fp[:,0].reshape(-1,1), fp[:,1].reshape(-1,1)))
+  fp = np.hstack((fp[:,0].reshape(-1,1), -fp[:,1].reshape(-1,1)))
   return fp
 
 
@@ -609,7 +609,8 @@ if __name__ == '__main__':
 
   path = np.hstack((out[0].reshape(-1,1),out[1].reshape(-1,1)))
 
-  im_center = np.array([[-7.969707,-4.438220]]);
+  im_center = np.array([[-7.969707,-4.438220]])
+  
   out_path = TransformPoints(path, im_center)
 
 
