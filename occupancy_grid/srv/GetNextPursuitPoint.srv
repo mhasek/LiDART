@@ -1,4 +1,0 @@
-nav_msgs/Odometry current_odom
-float32 radius
----
-geometry_msgs/Point pursuit_point
